@@ -161,7 +161,7 @@ x-common-keys-media: &common-keys-media
 ## 8096 - Sonarr
 ## 8097 - Handbrake
 ## 8098 - Picard
-## 8089 - Wrapper
+## 8099 - Wrapper
 ## 8100 - Transmission
 #
 ## 32400 - Plex
@@ -720,7 +720,7 @@ services:
     depends_on:
       - plex
     ports:
-      - "8089:8282" # INT PORT: 8282/tcp
+      - "8099:8282" # INT PORT: 8282/tcp
     volumes:
       - ${DOCKERDIR}/appdata/wrapperr/config:/config
       - ${DOCKERDIR}/appdata/wrapperr/data:/data
