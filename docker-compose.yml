@@ -143,14 +143,14 @@ x-common-keys-media: &common-keys-media
 ## 80/443 - Nginx Proxy
 ## 8080 - Homarr
 ## 8081 - Portainer
-## 8082 - Dozzle
-## 8083 - PGAdmin
-## 8084 - FileBrowser
-## 8085 - Keycloak
-## 8086 - Nginx Proxy Admin
-## 8087 - Tautulli
-## 8088 - Wrapper
-## 8089 - Transmission
+## 8082 - Nginx Proxy Admin
+## 8083 - FileBrowser
+## 8084 - Keycloak
+## 8085 - Keycloak TLS
+## 8086 - PGAdmin
+## 8087 - PGAdmin TLS
+## 8088 - Tautulli
+## 8089 - Dozzle # currently has issues on web interface
 #
 ## 8090 - Overseerr
 ## 8091 - Bazarr
@@ -161,6 +161,8 @@ x-common-keys-media: &common-keys-media
 ## 8096 - Sonarr
 ## 8097 - Handbrake
 ## 8098 - Picard
+## 8089 - Wrapper
+## 8100 - Transmission
 #
 ## 32400 - Plex
 #
@@ -168,26 +170,28 @@ x-common-keys-media: &common-keys-media
 #
 ####  APPLICATION  #### EXT PORT ### INT PORT ####
 ## Bazarr          #   8091/tcp   #   6767/tcp   #
-## Dozzle          #   8082/tcp   #   8080/tcp   #
-## FileBrowser     #   8084/tcp   #    80/tcp    #
+## Dozzle          #   8089/tcp   #   8080/tcp   #
+## FileBrowser     #   8083/tcp   #    80/tcp    #
 ## Handbrake       #   8097/tcp   #   5800/tcp   #
 ## Homarr          #   8080/tcp   #   7575/tcp   #
-## Keycloak        #   8085/tcp   #   8443/tcp   #  
+## Keycloak        #   8084/tcp   #   8080/tcp   #
+## Keycloak TLS    #   8085/tcp   #   8443/tcp   #  
 ## Lidarr          #   8092/tcp   #   8686/tcp   #
-## Nginx Admin     #   8086/tcp   #   8181/tcp   #
+## Nginx Admin     #   8082/tcp   #   8181/tcp   #
 ## Nginx Proxy     #  80/443/tcp  #  80/443/tcp  #
 ## Overseerr       #   8090/tcp   #   5055/tcp   #
-## PGAdmin         #   8083/tcp   #    80/tcp    #
+## PGAdmin         #   8086/tcp   #    80/tcp    #
+## PGAdmin TLS     #   8087/tcp   #    443/tcp   $
 ## Picard          #   8098/tcp   #   5800/tcp   #
 ## Plex            #  32400/tcp   #  32400/tcp   #
 ## Portainer       #   8081/tcp   #   9443/tcp   #
 ## Prowlarr        #   8093/tcp   #   9696/tcp   #
 ## Radarr          #   8094/tcp   #   7878/tcp   #
 ## Readarr         #   8095/tcp   #   8787/tcp   #
-## Tautulli        #   8087/tcp   #   8181/tcp   #
-## Transmission    #   8089/tcp   #   9091/tcp   #
+## Tautulli        #   8088/tcp   #   8181/tcp   #
+## Transmission    #   8100/tcp   #   9091/tcp   #
 ## Sonarr          #   8096/tcp   #   8989/tcp   #
-## Wrapper         #   8088/tcp   #   8282/tcp   #
+## Wrapper         #   8099/tcp   #   8282/tcp   #
 #
 ########## SPECIAL Definition ##########
 #
@@ -304,7 +308,7 @@ services:
     container_name: dozzle
     image: amir20/dozzle:latest
     ports:
-      - "8082:8080" # INT PORT: 8080/tcp
+      - "8089:8080" # INT PORT: 8080/tcp
     environment:
       DOZZLE_LEVEL: info
       DOZZLE_FILTER: "label=log_me" # limits logs displayed to containers with this label.
@@ -316,7 +320,7 @@ services:
     container_name: filebrowser
     image: filebrowser/filebrowser:s6
     ports:
-      - "8086:80" # INT PORT: 80/tcp
+      - "8083:80" # INT PORT: 80/tcp
     volumes:
       - ${DOCKERDIR}/appdata/filebrowser/config:/config 
       - ${DOCKERDIR}/appdata/filebrowser/data:/data
@@ -334,11 +338,12 @@ services:
       context: .
       args:
         KEYCLOAK_VERSION: 22.0.0
-    command: ['start', '--optimized']
+    command: ['start', '--optimized''', 'quarkus.transaction-manager.enable-recovery=true']
     depends_on:
       - postgres
     ports:
-      - "8085:8443"
+      - "8084:8080" # INT PORT: 8080/tcp (for init setup)
+      - "8085:8443" # INT PORT: 8443/tcp (secure port)
       # - "8787:8787" # Debug port
     volumes:
       - ${DOCKERDIR}/appdata/keycloak/config:/config 
@@ -348,9 +353,9 @@ services:
       KC_DB_PASSWORD: ${KC_DB_PASS}
       KC_DB_URL: jdbc:postgresql://postgres/keycloak
       KC_DB_USERNAME: ${KC_DB_USER}
-      KC_HEALTH_ENABLED: 'true'
+      #KC_HEALTH_ENABLED: 'true'
       KC_HTTP_ENABLED: 'true'
-      KC_METRICS_ENABLED: 'true'
+      #KC_METRICS_ENABLED: 'true'
       # KC_HOSTNAME: keycloak.com.au
       # KC_HOSTNAME_PORT: 8180
       KC_HOSTNAME_URL: http://keycloak.com.au:8180
@@ -382,7 +387,7 @@ services:
     ports:
       - "80:80" # Disable after LetsEncrypt setup
       - "443:443" # HTTPS PORT
-      - "8086:8181" # INT PORT: 8181/tcp (this is the admin port)
+      - "8082:8181" # INT PORT: 8181/tcp (this is the admin port)
     volumes:
       - ${DOCKERDIR}/appdata/nginx/config:/config 
       - ${DOCKERDIR}/appdata/nginx/data:/data
@@ -417,7 +422,7 @@ services:
     container_name: postgres
     image: "postgres:latest"
     healthcheck:
-      test: [ "CMD", "pg_isready", "-q", "-d", "postgres", "-U", "root" ]
+      test: [ "CMD", "pg_isready"]
       timeout: 45s
       interval: 1s
       retries: 10
@@ -441,13 +446,15 @@ services:
     depends_on:
       - postgres
     ports:
-      - "8083:80" # INT PORT: 80/tcp
+      - "8086:80" # INT PORT: 80/tcp (for init setup)
+      - "8087:9443" # INT PORT: 9443/tcp (secure port)
     volumes:
       - ${DOCKERDIR}/appdata/pgadmin/config:/config
       - ${DOCKERDIR}/appdata/pgadmin/data:/data
     environment:
       PGADMIN_DEFAULT_EMAIL: ${PG_EMAIL}
       PGADMIN_DEFAULT_PASSWORD: ${PG_PASS}
+      PGADMIN_ENABLE_TLS: true
 
   ########## DOWNLOADERS/VPNS ##########
 
@@ -488,7 +495,7 @@ services:
     depends_on:
       - gluetun
     ports:
-      - "8089:9091" # INT PORT: 9091/tcp
+      - "8099:9091" # INT PORT: 9091/tcp
       - "51413:51413"
       - "51413:51413/udp"
     cap_add:
@@ -697,7 +704,7 @@ services:
     depends_on:
       - plex
     ports:
-      - "8087:8181" # INT PORT: 8181/tcp
+      - "8088:8181" # INT PORT: 8181/tcp
     volumes:
       - ${DOCKERDIR}/appdata/tautulli/config:/config
       - ${DOCKERDIR}/appdata/tautulli/data:/data
@@ -713,7 +720,7 @@ services:
     depends_on:
       - plex
     ports:
-      - "8088:8282" # INT PORT: 8282/tcp
+      - "8089:8282" # INT PORT: 8282/tcp
     volumes:
       - ${DOCKERDIR}/appdata/wrapperr/config:/config
       - ${DOCKERDIR}/appdata/wrapperr/data:/data
