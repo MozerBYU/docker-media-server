@@ -1,0 +1,721 @@
+version: "3.9"
+
+########## NETWORKS ##########
+# You may customize the network subnets as you please
+# Docker Compose version 3.5 or higher required to define networks this way.
+
+networks:
+  default:
+    driver: bridge
+  frontend_proxy: # Frontend Apps Network
+    name: frontend_proxy
+    driver: bridge
+    ipam:
+      config:
+        - subnet: ${FRONTEND_NETWORK}
+  backend_proxy: # Backend Apps Network
+    name: backend_proxy
+    driver: bridge
+    ipam:
+      config:
+        - subnet: ${BACKEND_NETWORK} 
+  socket_proxy: # Socket Proxy Network. !!!!WARNING!!! Only socketproxy and services that need it should be on this network
+    name: socket_proxy
+    driver: bridge
+    ipam:
+      config:
+        - subnet: ${SOCKET_NETWORK}
+# See https://www.smarthomebeginner.com/traefik-docker-security-best-practices/#9_Use_a_Docker_Socket_Proxy
+# as well as https://github.com/Tecnativa/docker-socket-proxy
+
+########## EXTENSION FIELDS ##########
+
+# Common environment values
+x-environment: &default-tz-puid-pgid
+  TZ: ${TZ}
+  PUID: ${PUID}
+  PGID: ${PGID}
+
+# Keys for core apps
+x-common-keys-apps: &common-keys-apps
+  networks: 
+    - frontend_proxy
+  security_opt:
+    - no-new-privileges:true
+  restart: unless-stopped
+
+# Keys for core services
+x-common-keys-core: &common-keys-core
+  networks: 
+    - frontend_proxy
+  security_opt:
+    - no-new-privileges:true
+  restart: always
+
+# Keys for core db services
+x-common-keys-db: &common-keys-db
+  networks: 
+    - backend_proxy
+  security_opt:
+    - no-new-privileges:true
+  restart: always
+
+# Keys for core media services
+x-common-keys-media: &common-keys-media
+  networks: 
+    - frontend_proxy
+  security_opt:
+    - no-new-privileges:true
+  restart: unless-stopped
+
+########## SERVICES ##########
+#
+# All services listed by application type in alphabetical order
+#
+##### Docker Security #####
+#
+## - Socket Proxy (Docker Socket Protector)
+## - WatchTower (Docker Container Updater)
+#
+##### Docker Utility Apps #####
+#
+## - Docker GC (Garbage Collection)
+## - Dozzle (Docker Log Viewer)
+## - FileBrowser (Browse Downloads and other Files)
+#
+##### Authentication #####
+#
+## - KeyCloak (IPAM SSO Service)
+### See https://developers.redhat.com/blog/2018/10/08/configuring-nginx-keycloak-oauth-oidc
+#
+##### Frontend UI Apps #####
+#
+## - Homarr (Application Dashboard)
+## - Nginx (Webserver/Reverse Proxy)
+## - Portainer (Web UI)
+#
+##### Backend Apps #####
+#
+## - Postgres (Relational Database)
+## - PGAdmin (DB Web UI)
+#
+##### Downloading/Torrenting Apps #####
+#
+## - Gluetun (VPN Helper)
+## - Transmission (Torrentor)
+#
+##### Media Apps #####
+#
+## - Bazarr (Subtitles)
+## - Lidarr (Music)
+## - Overseerr (Media Requester)
+## - Prowlarr (Indexer Manager)
+## - Radarr (Movies)
+## - Readarr (Books)
+## - Sonarr (TV Shows)
+#
+##### Media Server Apps #####
+#
+## - Handbrake (Video Converter)
+## - Picard (Music Management)
+## - Plex (Media Server)
+## - Tautulli (Plex Monitoring)
+## - Wrapparr (Plex History and UX Helper)
+#
+##### Apps to potentially add #####
+#
+## - Authelli (Authentication)
+## - OAuth2 Proxy (Authentication Service)
+## - Sabnzbd (Downloader)
+## - Wizarr (UX Helper)
+#
+########## SERVICES PORTS ##########
+#
+##### APPS WITHOUT A WEB UI PORT #####
+#
+## - Docker GC
+## - GlueTun
+## - Socket Proxy
+## - WatchTower
+
+##### IN ORDER BY PORT NUMBER #####
+#
+## 80/443 - Nginx Proxy
+## 8080 - Homarr
+## 8081 - Portainer
+## 8082 - Dozzle
+## 8083 - PGAdmin
+## 8084 - FileBrowser
+## 8085 - Keycloak
+## 8086 - Nginx Proxy Admin
+## 8087 - Tautulli
+## 8088 - Wrapper
+## 8089 - Transmission
+#
+## 8090 - Overseerr
+## 8091 - Bazarr
+## 8092 - Lidarr
+## 8093 - Prowlarr
+## 8094 - Radarr
+## 8095 - Readarr
+## 8096 - Sonarr
+## 8097 - Handbrake
+## 8098 - Picard
+#
+## 32400 - Plex
+#
+##### IN ORDER BY APPLICATION #####
+#
+####  APPLICATION  #### EXT PORT ### INT PORT ####
+## Bazarr          #   8091/tcp   #   6767/tcp   #
+## Dozzle          #   8082/tcp   #   8080/tcp   #
+## FileBrowser     #   8084/tcp   #    80/tcp    #
+## Handbrake       #   8097/tcp   #   5800/tcp   #
+## Homarr          #   8080/tcp   #   7575/tcp   #
+## Keycloak        #   8085/tcp   #   8443/tcp   #  
+## Lidarr          #   8092/tcp   #   8686/tcp   #
+## Nginx Admin     #   8086/tcp   #   8181/tcp   #
+## Nginx Proxy     #  80/443/tcp  #  80/443/tcp  #
+## Overseerr       #   8090/tcp   #   5055/tcp   #
+## PGAdmin         #   8083/tcp   #    80/tcp    #
+## Picard          #   8098/tcp   #   5800/tcp   #
+## Plex            #  32400/tcp   #  32400/tcp   #
+## Portainer       #   8081/tcp   #   9443/tcp   #
+## Prowlarr        #   8093/tcp   #   9696/tcp   #
+## Radarr          #   8094/tcp   #   7878/tcp   #
+## Readarr         #   8095/tcp   #   8787/tcp   #
+## Tautulli        #   8087/tcp   #   8181/tcp   #
+## Transmission    #   8089/tcp   #   9091/tcp   #
+## Sonarr          #   8096/tcp   #   8989/tcp   #
+## Wrapper         #   8088/tcp   #   8282/tcp   #
+#
+########## SPECIAL Definition ##########
+#
+# All services definition follow the same format
+  # name
+  # >> Container Creation Settings
+  #   extension fields
+  #   container_name
+  #   image
+  #   commands
+  #   privileges
+  #   any dependencies
+  # >> Network Settings
+  #   networks
+  #   ports
+  # >> Container Use Settings
+  #   devices
+  #   volumes
+  #   environment
+#
+
+services:
+
+  ########## DOCKER SECURITY ##########
+  # Socket Proxy - For Docker Socket Protection
+  socket-proxy:
+    container_name: socket-proxy
+    image: tecnativa/docker-socket-proxy
+    privileged: true # true for VMs, false for LXCs
+    restart: always
+    networks: 
+      - socket_proxy
+    ports:
+      - "2375:2375" # !!!WARNING!!! DO NOT EXPOSE OVER PUBLIC INTERNET
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+    environment:
+      - LOG_LEVEL=info # debug,info,notice,warning,err,crit,alert,emerg
+      ## Variables match the URL prefix (i.e. AUTH blocks access to /auth/* parts of the API, etc.).
+      # 0 to revoke access.
+      # 1 to grant access.
+      ## Granted by Default
+      - EVENTS=1
+      - PING=1
+      - VERSION=1
+      ## Revoked by Default
+      # Security critical
+      - AUTH=0
+      - SECRETS=0
+      - POST=1 # Watchtower
+      # Not always needed
+      - BUILD=0
+      - COMMIT=0
+      - CONFIGS=0
+      - CONTAINERS=1 # Nginx, Portainer, etc.
+      - DISTRIBUTION=0
+      - EXEC=0
+      - IMAGES=1 # Portainer
+      - INFO=1 # Portainer
+      - NETWORKS=1 # Portainer
+      - NODES=0
+      - PLUGINS=0
+      - SERVICES=1 # Portainer
+      - SESSION=0
+      - SWARM=0
+      - SYSTEM=0
+      - TASKS=1 # Portainer
+      - VOLUMES=1 # Portainer
+
+  # WatchTower - Automatic Docker Container Updates
+  watchtower:
+      <<: *common-keys-core # See EXTENSION FIELDS at the top
+      container_name: watchtower
+      image: containrrr/watchtower
+      volumes:
+        - ${DOCKERDIR}/appdata/watchtower/config:/config
+        - /var/run/docker.sock:/var/run/docker.sock
+      environment:
+        TZ: ${TZ}
+        WATCHTOWER_CLEANUP: "true"
+        WATCHTOWER_REMOVE_VOLUMES: "true"
+        WATCHTOWER_INCLUDE_STOPPED: "true"
+        WATCHTOWER_NO_STARTUP_MESSAGE: "false"
+        WATCHTOWER_SCHEDULE: "0 30 12 * * *" # Everyday at 12:30
+        DOCKER_HOST: tcp://socket-proxy:2375
+        DOCKER_API_VERSION: "1.40"
+
+  ########## AUTHENTICATION ##########
+
+  ########## DOCKER UTILITES ##########
+
+  # Docker-GC - Automatic Docker Garbage Collection
+  dockergc:
+    <<: *common-keys-apps # See EXTENSION FIELDS at the top
+    container_name: docker-gc
+    image: clockworksoul/docker-gc-cron:latest
+    volumes:
+      - ${DOCKERDIR}/appdata/docker-gc/config:/config
+      #- ${DOCKERDIR}/appdata/docker-gc/./docker-gc-exclude:/etc/docker-gc-exclude # Create empty file
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      TZ: $TZ
+      CRON: 0 0 0 * * ? # Run everyday at midnight
+      FORCE_IMAGE_REMOVAL: 1
+      FORCE_CONTAINER_REMOVAL: 0
+      GRACE_PERIOD_SECONDS: 604800
+      DRY_RUN: 0
+      CLEAN_UP_VOLUMES: 1
+      DOCKER_HOST: tcp://socket-proxy:2375
+
+  # Dozzle - Real-time Docker Log Viewer
+  dozzle:
+    <<: *common-keys-apps
+    container_name: dozzle
+    image: amir20/dozzle:latest
+    ports:
+      - "8082:8080" # INT PORT: 8080/tcp
+    environment:
+      DOZZLE_LEVEL: info
+      DOZZLE_FILTER: "label=log_me" # limits logs displayed to containers with this label.
+      DOCKER_HOST: tcp://socket-proxy:2375
+
+  # File Browser - Explorer
+  filebrowser:
+    <<: *common-keys-apps 
+    container_name: filebrowser
+    image: filebrowser/filebrowser:s6
+    ports:
+      - "8086:80" # INT PORT: 80/tcp
+    volumes:
+      - ${DOCKERDIR}/appdata/filebrowser/config:/config 
+      - ${DOCKERDIR}/appdata/filebrowser/data:/data
+    environment:
+      <<: *default-tz-puid-pgid
+
+  ########## AUTHENTICATION ##########
+
+  # Keycloak - IPAM SSO Service
+  keycloak:
+    <<: *common-keys-core # See EXTENSION FIELDS at the top
+    container_name: keycloak
+    image: quay.io/keycloak/keycloak:latest
+    build:
+      context: .
+      args:
+        KEYCLOAK_VERSION: 22.0.0
+    command: ['start', '--optimized']
+    depends_on:
+      - postgres
+    ports:
+      - "8085:8443"
+      # - "8787:8787" # Debug port
+    volumes:
+      - ${DOCKERDIR}/appdata/keycloak/config:/config 
+      - ${DOCKERDIR}/appdata/keycloak/data:/data
+    environment:
+      JAVA_OPTS_APPEND: -Dkeycloak.profile.feature.upload_scripts=enabled
+      KC_DB_PASSWORD: ${KC_DB_PASS}
+      KC_DB_URL: jdbc:postgresql://postgres/keycloak
+      KC_DB_USERNAME: ${KC_DB_USER}
+      KC_HEALTH_ENABLED: 'true'
+      KC_HTTP_ENABLED: 'true'
+      KC_METRICS_ENABLED: 'true'
+      # KC_HOSTNAME: keycloak.com.au
+      # KC_HOSTNAME_PORT: 8180
+      KC_HOSTNAME_URL: http://keycloak.com.au:8180
+      KC_PROXY: reencrypt
+      KEYCLOAK_ADMIN: ${KC_USER}
+      KEYCLOAK_ADMIN_PASSWORD: ${KC_PASS}
+
+  ########## FRONTENDS ##########
+
+  # Homarr - Application Dashboard
+  homarr:
+    <<: *common-keys-core
+    container_name: homarr
+    image: ghcr.io/ajnart/homarr:latest
+    ports:
+      - "8080:7575" # INT PORT: 7575/tcp
+    volumes:
+      - ${DOCKERDIR}/appdata/homarr/config:/config
+      - ${DOCKERDIR}/appdata/homarr/data:/data
+      - ${DOCKERDIR}/appdata/homarr/icons:/app/public/icons
+    environment:
+      <<: *default-tz-puid-pgid
+      
+  # Nginx Proxy Manager - Reverse Proxy with LetsEncrypt
+  nginx:
+    <<: *common-keys-core
+    container_name: nginx
+    image: 'jc21/nginx-proxy-manager:latest'
+    ports:
+      - "80:80" # Disable after LetsEncrypt setup
+      - "443:443" # HTTPS PORT
+      - "8086:8181" # INT PORT: 8181/tcp (this is the admin port)
+    volumes:
+      - ${DOCKERDIR}/appdata/nginx/config:/config 
+      - ${DOCKERDIR}/appdata/nginx/data:/data
+      - ${DOCKERDIR}/appdata/nginx/letsencrypt:/etc/letsencrypt
+    environment:
+      DB_SQLITE_FILE: "/config/database.sqlite"
+      DISABLE_IPV6: 'true'
+
+  # Portainer - WebUI for Containers
+  portainer:
+    <<: *common-keys-core
+    container_name: portainer
+    image: portainer/portainer-ce:latest
+    depends_on: 
+      - socket-proxy
+    command: [-H, tcp://socket-proxy:2375] # For Docker Socket Proxy
+    ports: 
+      - "8081:9443" # INT PORT: 9000/tcp and 9443/tcp
+      # - "8000:8000" # Tunnel Server port for Portainer Agent Communications
+    volumes:
+      - ${DOCKERDIR}/appdata/portainer/config:/config
+      - ${DOCKERDIR}/appdata/portainer/data:/data
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      <<: *default-tz-puid-pgid
+
+  ########## BACKENDS ##########
+
+  # Postgres - Database for Keycloak
+  postgres:
+    <<: *common-keys-db
+    container_name: postgres
+    image: "postgres:latest"
+    healthcheck:
+      test: [ "CMD", "pg_isready", "-q", "-d", "postgres", "-U", "root" ]
+      timeout: 45s
+      interval: 1s
+      retries: 10
+    ports:
+      - "5432:5432" # INT PORT: 5432/tcp
+    volumes:
+      - ${DOCKERDIR}/appdata/postgres/config:/config
+      - ${DOCKERDIR}/appdata/postgres/data:/var/lib/postgresql/data
+      #- ./sql:/docker-entrypoint-initdb.d/:ro # turn it on, if you need run init DB
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASS}
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_HOST: ${DB_HOST}
+
+  # PGAdmin - Application Dashboard for Postgres DB
+  pgadmin:
+    <<: *common-keys-db
+    container_name: pgadmin
+    image: "dpage/pgadmin4:5.1"
+    depends_on:
+      - postgres
+    ports:
+      - "8083:80" # INT PORT: 80/tcp
+    volumes:
+      - ${DOCKERDIR}/appdata/pgadmin/config:/config
+      - ${DOCKERDIR}/appdata/pgadmin/data:/data
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PG_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PG_PASS}
+
+  ########## DOWNLOADERS/VPNS ##########
+
+  # GlueTun - VPN Client
+  gluetun:
+    <<: *common-keys-apps
+    container_name: gluetun
+    image: qmcgaw/gluetun
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    command: [update, -enduser, -providers, mullvad]
+    ports:
+      - "8888:8888" # HTTP proxy
+      - "8388:8388/tcp" # Shadowsocks
+      - "8388:8388/udp" # Shadowsocks
+    volumes:
+      - ${DOCKERDIR}/appdata/gluetun/data:/data
+      - ${DOCKERDIR}/appdata/gluetun/config:/config
+      - /etc/localtime:/etc/localtime:ro
+    environment:
+      VPN_SERVICE_PROVIDER: ivpn
+      VPN_TYPE: openvpn
+      # OpenVPN:
+      OPENVPN_USER: blank
+      OPENVPN_PASSWOR: blank
+      # Wireguard:
+      # WIREGUARD_PRIVATE_KEY=
+      # WIREGUARD_ADDRESSES=
+      UPDATER_PERIOD: 1d
+
+  # Transmission - Torrentor
+  transmission:
+    <<: *common-keys-apps
+    container_name: transmission
+    image: lscr.io/linuxserver/transmission:latest
+    depends_on:
+      - gluetun
+    ports:
+      - "8089:9091" # INT PORT: 9091/tcp
+      - "51413:51413"
+      - "51413:51413/udp"
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun
+    volumes:
+      - ${DOCKERDIR}/appdata/transmission/config:/config
+      - ${DOCKERDIR}/appdata/transmission/data:/data
+      - ${DATADIR}/downloads:/downloads
+    environment:
+      <<: *default-tz-puid-pgid
+      TRANSMISSION_WEB_HOME: #optional
+      USER=: #optional
+      PASS: #optional
+      WHITELIST: #optional
+      PEERPORT: #optional
+      HOST_WHITELIST: #optional
+
+  ########## MEDIA APPS - THE ARRs ##########
+
+  # Bazarr - Subtitle Management
+  bazarr:
+    <<: *common-keys-media # See EXTENSION FIELDS at the top
+    image: lscr.io/linuxserver/bazarr
+    container_name: bazarr
+    ports:
+      - "8091:6767" # INT PORT: 6767/tcp
+    volumes:
+      - ${DOCKERDIR}/appdata/bazarr:/config
+      - ${DOCKERDIR}/appdata/data:/data
+      - ${DATADIR}/media/movies:/media/movies
+      - ${DATADIR}/media/tvshows:/media/tvshows
+    environment:
+      <<: *default-tz-puid-pgid
+
+  # Lidarr - Music Management
+  lidarr:
+    <<: *common-keys-media
+    container_name: lidarr
+    image: lscr.io/linuxserver/lidarr:latest
+    ports:
+      - "8092:8686" # INT PORT: 8686/tcp
+    volumes:
+      - ${DOCKERDIR}/appdata/lidarr/config:/config
+      - ${DOCKERDIR}/appdata/lidarr/data:/data
+      - ${DATADIR}/downloads:/downloads
+      - ${DATADIR}/media/music:/media
+    environment:
+      <<: *default-tz-puid-pgid
+
+  # Overseerr - Media Requester
+  overseerr:
+    <<: *common-keys-apps
+    container_name: overseerr
+    image: lscr.io/linuxserver/overseerr:latest
+    ports:
+      - "8090:5055" # INT PORT: 5055/tcp
+    volumes:
+      - ${DOCKERDIR}/apps/overseer/config:/config
+      - ${DOCKERDIR}/appdata/overseer/data:/data
+      - ${DATADIR}/downloads:/downloads
+    environment:
+      <<: *default-tz-puid-pgid
+
+  # Prowlarr - Indexer Management
+  prowlarr:
+    <<: *common-keys-apps
+    container_name: prowlarr
+    image: ghcr.io/linuxserver/prowlarr:latest
+    ports:
+      - "8093:9696" # INT PORT: 9696/tcp
+    volumes:
+      - ${DOCKERDIR}/appdata/prowlarr/config:/config
+      - ${DOCKERDIR}/appdata/prowlarr/data:/data
+      - ${DATADIR}/downloads:/downloads
+    environment:
+      <<: *default-tz-puid-pgid
+
+  # Radarr - Movie Management
+  radarr:
+    <<: *common-keys-media
+    container_name: radarr
+    image: lscr.io/linuxserver/radarr:latest
+    ports:
+      - "8094:7878" # INT PORT: 7878/tcp
+    volumes:
+      - ${DOCKERDIR}/apps/radarr/config:/config
+      - ${DOCKERDIR}/appdata/radarr/data:/data/
+      - ${DATADIR}/downloads:/downloads
+      - ${DATADIR}/media/movies:/media
+    environment:
+      <<: *default-tz-puid-pgid
+
+  # Readarr - Books Management
+  readarr:
+    <<: *common-keys-media
+    container_name: readarr
+    image: lscr.io/linuxserver/readarr:develop
+    ports:
+      - "8095:8787" # INT PORT: 8787/tcp
+    volumes:
+      - ${DOCKERDIR}/appdata/readarr/config:/config
+      - ${DOCKERDIR}/appdata/readarr/data:/data
+      - ${DATADIR}/downloads:/downloads
+      - ${DATADIR}/media/books:/media
+    environment:
+      <<: *default-tz-puid-pgid
+      UMASK: 002
+
+  # Sonarr - TV Shows Management
+  sonarr:
+    <<: *common-keys-media
+    container_name: sonarr
+    image: lscr.io/linuxserver/sonarr:latest
+    ports:
+      - "8096:8989" # INT PORT: 8989/tcp
+    volumes:
+      - ${DOCKERDIR}/apps/sonarr/config:/config
+      - ${DOCKERDIR}/appdata/sonarr/data:/data
+      - ${DATADIR}/downloads:/downloads
+      - ${DATADIR}/media/tvshows:/media
+    environment:
+      <<: *default-tz-puid-pgid
+  
+  ########## MEDIA SERVER APPS ##########
+
+  # Handbrake - Video Conversion (Transcoding and compression)
+  handbrake:
+    <<: *common-keys-apps # See EXTENSION FIELDS at the top
+    container_name: handbrake
+    image: jlesage/handbrake:latest
+    ports:
+      - "8097:5800" # INT PORT: 5800/tcp
+    volumes:
+      - ${DOCKERDIR}/appdata/handbrake/config:/config
+      - ${DOCKERDIR}/appdata/handbrake/data:/data
+      - ${DOCKERDIR}/appdata/handbrake/watch:/watch
+      - ${DATADIR}/downloads:/downloads
+    environment:
+      <<: *default-tz-puid-pgid
+      UMASK: 002
+      KEEP_APP_RUNNING: 1
+      CLEAN_TMP_DIR: 1
+      DISPLAY_WIDTH: 1600
+      DISPLAY_HEIGHT: 960
+      AUTOMATED_CONVERSION_KEEP_SOURCE: 1
+
+  # Picard - Music Library Tagging and Management
+  picard:
+    <<: *common-keys-apps # See EXTENSION FIELDS at the top
+    container_name: picard
+    image: mikenye/picard:latest
+    ports:
+      - "8098:5800" # INT PORT: 5800/tcp 
+    volumes:
+      - ${DOCKERDIR}/appdata/picard:/config:rw
+      - ${DATADIR}/media/music:/media/music
+      - ${DATADIR}/media/podcasts:/media/podcasts
+      - ${DATADIR}/media/playlists:/media/playlists
+      - /dev/shm:/dev/shm
+    environment:
+      <<: *default-tz-puid-pgid
+      UMASK: 002
+      DISPLAY_WIDTH: 1600
+      DISPLAY_HEIGHT: 960
+
+  # Plex - Media Server
+  plex:
+    <<: *common-keys-core
+    container_name: plex
+    image: plexinc/pms-docker:public
+    ports:
+      - "32400:32400" # INT PORT: 32400/tcp (this is the web port)
+      - "3005:3005/tcp"
+      - "8324:8324/tcp"
+      - "32469:32469/tcp"
+      # - "1900:1900/udp" # Conflicts with xTeVe and Synology default ports
+      - "32410:32410/udp"
+      - "32412:32412/udp"
+      - "32413:32413/udp"
+      - "32414:32414/udp"
+      # - "33400:33400" # If you use Plex Web Tools
+    devices:
+      - /dev/dri:/dev/dri # for harware transcoding
+    volumes:
+      - ${DOCKERDIR}/appdata/plex/config:/config
+      - ${DOCKERDIR}/appdata/plex/data:/data
+      - ${DATADIR}/media/movies:/media/movies
+      - ${DATADIR}/media/music:/media/music
+      - ${DATADIR}/media/podcasts:/media/podcasts
+      - ${DATADIR}/media/playlists:/media/playlists
+      - ${DATADIR}/media/tvshows:/media/tvshows
+      - /dev/shm:/transcode
+    environment:
+      <<: *default-tz-puid-pgid
+      HOSTNAME: "media.${DOMAIN}"
+      #PLEX_CLAIM_FILE: $PLEX_CLAIM # is this even needed
+      ADVERTISE_IP: http://${SERVER_IP}:32400/
+
+  # Tautulli - Plex Stats and Monitoring
+  tautulli:
+    <<: *common-keys-apps # See EXTENSION FIELDS at the top
+    container_name: tautulli
+    image: linuxserver/tautulli:latest
+    depends_on:
+      - plex
+    ports:
+      - "8087:8181" # INT PORT: 8181/tcp
+    volumes:
+      - ${DOCKERDIR}/appdata/tautulli/config:/config
+      - ${DOCKERDIR}/appdata/tautulli/data:/data
+      - ${DOCKERDIR}/appdata/plex/Library/Application Support/Plex Media Server/Logs:/logs:ro # For tautulli Plex log viewer
+    environment:
+      <<: *default-tz-puid-pgid
+      
+  # Wrapperr - Plex History and UX Helper
+  wrapperr:
+    <<: *common-keys-apps # See EXTENSION FIELDS at the top
+    container_name: wrapperr
+    image: ghcr.io/aunefyren/wrapperr:latest
+    depends_on:
+      - plex
+    ports:
+      - "8088:8282" # INT PORT: 8282/tcp
+    volumes:
+      - ${DOCKERDIR}/appdata/wrapperr/config:/config
+      - ${DOCKERDIR}/appdata/wrapperr/data:/data
+    environment:
+      <<: *default-tz-puid-pgid
