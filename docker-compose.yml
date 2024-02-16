@@ -495,7 +495,7 @@ services:
     depends_on:
       - gluetun
     ports:
-      - "8099:9091" # INT PORT: 9091/tcp
+      - "8100:9091" # INT PORT: 9091/tcp
       - "51413:51413"
       - "51413:51413/udp"
     cap_add:
