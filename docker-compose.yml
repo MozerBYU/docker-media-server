@@ -24,6 +24,12 @@ DB_SECRETS_FILE:
 PGADMIN_SECRETS_FILE:
   file: ${SECRETSDIR}/.secrets/pgadmin_secrets.txt
 
+##### LDAP SECRETS #####
+LDAP_ADMIN_SECRETS_FILE:
+  file: ${SECRETSDIR}/.secrets/ldap_root_secrets.txt 
+LDAP_CONFIG_SECRETS_FILE:
+  file: ${SECRETSDIR}/.secrets/ldap_config_secrets.txt
+
 ########## NETWORKS ##########
 # You may customize the network subnets as you please.
 # Docker Compose version 3.5 or higher required to define networks this way.
@@ -439,22 +445,119 @@ services:
     environment:
       <<: *basic-tz-puid-pgid
       <<: *disable-ipv6
+      # Using secrets file
       AUTHELIA_IDENTITY_VALIDATION_RESET_PASSWORD_JWT_SECRET_FILE: /run/secrets/AUTHELIA_JWT_SECRETS_FILE
       AUTHELIA_SESSION_SECRET_FILE: /run/secrets/AUTHELIA_SESSION_SECRETS_FILE
       AUTHELIA_STORAGE_ENCRYPTION_KEY_FILE: /run/secrets/AUTHELIA_ENCRYPTION_SECRETS_FILE
       AUTHELIA_STORAGE_POSTGRES_PASSWORD_FILE: /run/secrets/AUTHELIA_POSTGRES_SECRETS_FILE
+      # Using an attached secret file via volume
       #AUTHELIA_IDENTITY_VALIDATION_RESET_PASSWORD_JWT_SECRET_FILE: '/secrets/JWT_SECRET'
       #AUTHELIA_SESSION_SECRET_FILE: '/secrets/SESSION_SECRET'
       #AUTHELIA_STORAGE_ENCRYPTION_KEY_FILE: '/secrets/STORAGE_ENCRYPTION_KEY'
       #AUTHELIA_STORAGE_POSTGRES_PASSWORD_FILE: '/secrets/STORAGE_PASSWORD'
 
   # OpenLDAP - IAM Solution
+  openldap-main:
+    <<: *common-keys-core
+    container_name: openldap-backup
+    image: osixia/openldap:1.5.0
+    tty: true
+    stdin_open: true
+    volumes:
+      - /var/lib/ldap
+      - /etc/ldap/slapd.d
+      - /container/service/slapd/assets/certs/
+    # Note: 'hostname'.'domainname' must be the FQDN for the host for replication to work properly
+    hostname: "ldap2"
+    domainname: "domain.tld"
+    network:
+      - backend_proxy
+    ports:
+      - "389:389" # INT PORT 389/tcp
+      - "636:636" # INT PORT 636/rcp
+    environment:
+      <<: *default-tz-puid-pgid
+      <<: *disable-ipv6
+      LDAP_LOG_LEVEL: "256"
+      LDAP_ORGANISATION: "Example Inc."
+      LDAP_DOMAIN: "domain.tld"
+      LDAP_BASE_DN: ""
+      LDAP_ADMIN_PASSWORD: /run/secrets/LDAP_ADMIN_SECRETS_FILE
+      LDAP_CONFIG_PASSWORD: /run/secrets/LDAP_CONFIG_SECRETS_FILE
+      LDAP_READONLY_USER: "false"
+      #LDAP_READONLY_USER_USERNAME: "readonly"
+      #LDAP_READONLY_USER_PASSWORD: "readonly"
+      LDAP_RFC2307BIS_SCHEMA: "false"
+      LDAP_BACKEND: "mdb"
+      # LDAP TLS Settings #
+      LDAP_TLS: "true"
+      LDAP_TLS_CRT_FILENAME: /run/secrets/LDAP_TLS_CRT_FILE
+      LDAP_TLS_KEY_FILENAME: /run/secrets/LDAP_TLS_KEY_FILE
+      LDAP_TLS_DH_PARAM_FILENAME: "dhparam.pem"
+      LDAP_TLS_CA_CRT_FILENAME: "ca.crt"
+      LDAP_TLS_ENFORCE: "true"
+      LDAP_TLS_CIPHER_SUITE: "SECURE256:+SECURE128:-VERS-TLS-ALL:+VERS-TLS1.2:-RSA:-DHE-DSS:-CAMELLIA-128-CBC:-CAMELLIA-256-CBC" # Enforces TLS 1.2, and to use stronger ciphers 
+      # See: https://github.com/osixia/docker-openldap/issues/69
+      LDAP_TLS_VERIFY_CLIENT: "demand"
+      # LDAP Replication Settings #
+      LDAP_REPLICATION: "true"
+      LDAP_REPLICATION_CONFIG_SYNCPROV: 'binddn="cn=admin,cn=config" bindmethod=simple credentials="$$LDAP_CONFIG_PASSWORD" searchbase="cn=config" type=refreshAndPersist retry="60 +" timeout=1 starttls=critical'
+      LDAP_REPLICATION_DB_SYNCPROV: 'binddn="cn=admin,$$LDAP_BASE_DN" bindmethod=simple credentials="$$LDAP_ADMIN_PASSWORD" searchbase="$$LDAP_BASE_DN" type=refreshAndPersist interval=00:00:00:10 retry="60 +" timeout=1 starttls=critical'
+      LDAP_REPLICATION_HOSTS: "#PYTHON2BASH:['ldap://ldap1.domain.tld','ldap://ldap2.domain.tld']"
+      KEEP_EXISTING_CONFIG: "false"
+      LDAP_REMOVE_CONFIG_AFTER_SETUP: "true"
+      LDAP_SSL_HELPER_PREFIX: "ldap"
 
-  #     FIX ME     # 
-  #     FIX ME     #
-  #     FIX ME     # 
-  #     FIX ME     # 
-  #     FIX ME     # 
+  openldap-backup:
+    <<: *common-keys-core
+    container_name: openldap-backup
+    image: osixia/openldap:1.5.0
+    tty: true
+    stdin_open: true
+    volumes:
+      - /var/lib/ldap
+      - /etc/ldap/slapd.d
+      - /container/service/slapd/assets/certs/
+    # Note: 'hostname'.'domainname' must be the FQDN for the host for replication to work properly
+    hostname: "ldap2"
+    domainname: "domain.tld"
+    network:
+      - backend_proxy
+    ports:
+      - "389:389" # INT PORT 389/tcp
+      - "636:636" # INT PORT 636/rcp
+    environment:
+      <<: *default-tz-puid-pgid
+      <<: *disable-ipv6
+      LDAP_LOG_LEVEL: "256"
+      LDAP_ORGANISATION: "Example Inc."
+      LDAP_DOMAIN: "domain.tld"
+      LDAP_BASE_DN: ""
+      LDAP_ADMIN_PASSWORD: /run/secrets/LDAP_ADMIN_SECRETS_FILE
+      LDAP_CONFIG_PASSWORD: /run/secrets/LDAP_CONFIG_SECRETS_FILE
+      LDAP_READONLY_USER: "false"
+      #LDAP_READONLY_USER_USERNAME: "readonly"
+      #LDAP_READONLY_USER_PASSWORD: "readonly"
+      LDAP_RFC2307BIS_SCHEMA: "false"
+      LDAP_BACKEND: "mdb"
+      # LDAP TLS Settings #
+      LDAP_TLS: "true"
+      LDAP_TLS_CRT_FILENAME: /run/secrets/LDAP_TLS_CRT_FILE
+      LDAP_TLS_KEY_FILENAME: /run/secrets/LDAP_TLS_KEY_FILE
+      LDAP_TLS_DH_PARAM_FILENAME: "dhparam.pem"
+      LDAP_TLS_CA_CRT_FILENAME: "ca.crt"
+      LDAP_TLS_ENFORCE: "true"
+      LDAP_TLS_CIPHER_SUITE: "SECURE256:+SECURE128:-VERS-TLS-ALL:+VERS-TLS1.2:-RSA:-DHE-DSS:-CAMELLIA-128-CBC:-CAMELLIA-256-CBC" # Enforces TLS 1.2, and to use stronger ciphers 
+      # See: https://github.com/osixia/docker-openldap/issues/69
+      LDAP_TLS_VERIFY_CLIENT: "demand"
+      # LDAP Replication Settings #
+      LDAP_REPLICATION: "true"
+      LDAP_REPLICATION_CONFIG_SYNCPROV: 'binddn="cn=admin,cn=config" bindmethod=simple credentials="$$LDAP_CONFIG_PASSWORD" searchbase="cn=config" type=refreshAndPersist retry="60 +" timeout=1 starttls=critical'
+      LDAP_REPLICATION_DB_SYNCPROV: 'binddn="cn=admin,$$LDAP_BASE_DN" bindmethod=simple credentials="$$LDAP_ADMIN_PASSWORD" searchbase="$$LDAP_BASE_DN" type=refreshAndPersist interval=00:00:00:10 retry="60 +" timeout=1 starttls=critical'
+      LDAP_REPLICATION_HOSTS: "#PYTHON2BASH:['ldap://ldap1.domain.tld','ldap://ldap2.domain.tld']"
+      KEEP_EXISTING_CONFIG: "false"
+      LDAP_REMOVE_CONFIG_AFTER_SETUP: "true"
+      LDAP_SSL_HELPER_PREFIX: "ldap"
 
   ########## FRONTENDS ##########
 
@@ -556,9 +659,9 @@ services:
       - "51413:51413" # INT PORT 51413/tcp
       - "51413:51413/udp" # INT PORT 51413/udp
     cap_add:
-      - NET_ADMIN
+      - NET_ADMIN # Used to allow transmission access to network stack
     devices:
-      - /dev/net/tun
+      - /dev/net/tun # Used to allow transmission access to network stack
     volumes:
       - ${DOCKERDIR}/appdata/transmission/config:/config
       - ${DOCKERDIR}/appdata/transmission/data:/data
