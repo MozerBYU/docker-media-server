@@ -1,7 +1,31 @@
 version: "3.9"
 
+########## SECRETS ##########
+# The use of docker secrets is for importing secrets from files to keep sensitive usernames or passwords from being passed or preserved in plaintext.
+#
+## See: https://docs.docker.com/engine/swarm/secrets/#defining-and-using-secrets-in-compose-files
+## See also: https://docs.docker.com/reference/compose-file/secrets/
+#
+##### AUTHELIA SECRETS #####
+AUTHELIA_ENCRYPTION_SECRETS_FILE:
+  file: ${SECRETSDIR}/.secrets/authelia__encryption_secrets.txt
+AUTHELIA_JWT_SECRETS_FILE:
+  file: ${SECRETSDIR}/.secrets/authelia_jwt_secrets.txt
+AUTHELIA_POSTGRES_SECRETS_FILE:
+  file: ${SECRETSDIR}/.secrets/authelia_postgres_secrets.txt
+AUTHELIA_SESSION_SECRETS_FILE:
+  file: ${SECRETSDIR}/.secrets/authelia_session_secrets.txt
+
+##### DATABASE SECRETS #####
+DB_ROOT_SECRETS_FILE:
+  file: ${SECRETSDIR}/.secrets/db_root_secrets.txt
+DB_SECRETS_FILE:
+  file: ${SECRETSDIR}/.secrets/db_secrets.txt
+PGADMIN_SECRETS_FILE:
+  file: ${SECRETSDIR}/.secrets/pgadmin_secrets.txt
+
 ########## NETWORKS ##########
-# You may customize the network subnets as you please
+# You may customize the network subnets as you please.
 # Docker Compose version 3.5 or higher required to define networks this way.
 
 networks:
@@ -25,16 +49,22 @@ networks:
     ipam:
       config:
         - subnet: ${SOCKET_NETWORK}
-# See https://www.smarthomebeginner.com/traefik-docker-security-best-practices/#9_Use_a_Docker_Socket_Proxy
-# as well as https://github.com/Tecnativa/docker-socket-proxy
 
 ########## EXTENSION FIELDS ##########
 
 # Common environment values
-x-environment: &default-tz-puid-pgid
+x-environment-no-privilege: &basic-tz-puid-pgid
   TZ: ${TZ}
   PUID: ${PUID}
   PGID: ${PGID}
+
+x-environment-some-privilege: &higher-tz-puid-pgid
+  TZ: ${TZ}
+  PUID: ${PUID_PRIV}
+  PGID: ${PGID_PRIV}
+
+x-environment-network: &disable-ipv6
+  DISABLE_IPV6: "true"
 
 # Keys for core apps
 x-common-keys-apps: &common-keys-apps
@@ -71,129 +101,125 @@ x-common-keys-media: &common-keys-media
 ########## SERVICES ##########
 #
 # All services listed by application type in alphabetical order
+  #
+  ##### Docker Security #####
+  #
+  ## - Socket Proxy (Docker Socket Protector)
+  ## - WatchTower (Docker Container Updater)
+  #
+  ##### Docker Utility Apps #####
+  #
+  ## - Docker GC (Garbage Collection)
+  ## - Dozzle (Docker Log Viewer)
+  ## - FileBrowser (Browse Downloads and other Files)
+  ## - Portainer (Container Manager)
+  #
+  ##### Authentication #####
+  #
+  ## - Authelia
+  ## - OpenLDAP
+  ## See: https://www.authelia.com/integration/prologue/get-started/
+  ## and https://thehomelab.wiki/books/dns-reverse-proxy/page/setup-authelia-to-work-with-nginx-proxy-manager
+  #
+  ##### Frontend UI Apps #####
+  #
+  ## - Homarr (Application Dashboard)
+  ## - Nginx (Webserver/Reverse Proxy)
+  #
+  ##### Backend Apps #####
+  #
+  ## - Postgres (Relational Database)
+  ## - PGAdmin (DB Web UI)
+  #
+  ##### Downloader/Torrenting Apps #####
+  #
+  ## - Gluetun (VPN Helper)  
+  ## - Transmission (Torrentor)
+  #
+  ##### Media Apps #####
+  #
+  ## - Bazarr (Subtitles)
+  ## - Lidarr (Music)
+  ## - Overseerr (Media Requester)
+  ## - Prowlarr (Indexer Manager)
+  ## - Radarr (Movies)
+  ## - Readarr (Books)
+  ## - Sonarr (TV Shows)
+  #
+  ##### Media Server Apps #####
+  #
+  ## - Handbrake (Video Converter)
+  ## - Picard (Music Management)
+  ## - Plex (Media Server)
+  ## - Tautulli (Plex Monitoring)
+  ## - Wrapparr (Plex History and UX Helper)
 #
-##### Docker Security #####
-#
-## - Socket Proxy (Docker Socket Protector)
-## - WatchTower (Docker Container Updater)
-#
-##### Docker Utility Apps #####
-#
-## - Docker GC (Garbage Collection)
-## - Dozzle (Docker Log Viewer)
-## - FileBrowser (Browse Downloads and other Files)
-#
-##### Authentication #####
-#
-## - KeyCloak (IPAM SSO Service)
-### See https://developers.redhat.com/blog/2018/10/08/configuring-nginx-keycloak-oauth-oidc
-#
-##### Frontend UI Apps #####
-#
-## - Homarr (Application Dashboard)
-## - Nginx (Webserver/Reverse Proxy)
-## - Portainer (Web UI)
-#
-##### Backend Apps #####
-#
-## - Postgres (Relational Database)
-## - PGAdmin (DB Web UI)
-#
-##### Downloading/Torrenting Apps #####
-#
-## - Gluetun (VPN Helper)
-## - Transmission (Torrentor)
-#
-##### Media Apps #####
-#
-## - Bazarr (Subtitles)
-## - Lidarr (Music)
-## - Overseerr (Media Requester)
-## - Prowlarr (Indexer Manager)
-## - Radarr (Movies)
-## - Readarr (Books)
-## - Sonarr (TV Shows)
-#
-##### Media Server Apps #####
-#
-## - Handbrake (Video Converter)
-## - Picard (Music Management)
-## - Plex (Media Server)
-## - Tautulli (Plex Monitoring)
-## - Wrapparr (Plex History and UX Helper)
-#
-##### Apps to potentially add #####
-#
-## - Authelli (Authentication)
-## - OAuth2 Proxy (Authentication Service)
-## - Sabnzbd (Downloader)
-## - Wizarr (UX Helper)
-#
+
 ########## SERVICES PORTS ##########
 #
 ##### APPS WITHOUT A WEB UI PORT #####
 #
-## - Docker GC
-## - GlueTun
-## - Socket Proxy
-## - WatchTower
+  ## - Docker GC
+  ## - Socket Proxy
+  ## - WatchTower
+#
 
+##### APPS WITH A WEB UI PORT #####
 ##### IN ORDER BY PORT NUMBER #####
 #
-## 80/443 - Nginx Proxy
-## 8080 - Homarr
-## 8081 - Portainer
-## 8082 - Nginx Proxy Admin
-## 8083 - FileBrowser
-## 8084 - Keycloak
-## 8085 - Keycloak TLS
-## 8086 - PGAdmin
-## 8087 - PGAdmin TLS
-## 8088 - Tautulli
-## 8089 - Dozzle # currently has issues on web interface
-#
-## 8090 - Overseerr
-## 8091 - Bazarr
-## 8092 - Lidarr
-## 8093 - Prowlarr
-## 8094 - Radarr
-## 8095 - Readarr
-## 8096 - Sonarr
-## 8097 - Handbrake
-## 8098 - Picard
-## 8099 - Wrapper
-## 8100 - Transmission
-#
-## 32400 - Plex
+  ## 80/443 - Nginx Proxy
+  ## 8080 - Authelia
+  ## 8081 - Portainer
+  ## 8082 - Nginx Proxy Admin
+  ## 8083 - Homarr
+  ## 8084 - Filebrowser
+  ## 8085 - PGAdmin        # TO FIX
+  ## 8086 - PGAdmin TLS    # TO FIX- needs cert file
+  ## 8087 - Tautulli
+  ## 8088 - Dozzle
+  #
+  ## 8090 - Overseerr
+  ## 8091 - Bazarr
+  ## 8092 - Lidarr
+  ## 8093 - Prowlarr
+  ## 8094 - Radarr
+  ## 8095 - Readarr
+  ## 8096 - Sonarr
+  ## 8097 - Handbrake
+  ## 8098 - Picard
+  ## 8099 - Wrapper
+  ## 8100 - Transmission
+  #
+  ## 32400 - Plex
 #
 ##### IN ORDER BY APPLICATION #####
 #
 ####  APPLICATION  #### EXT PORT ### INT PORT ####
-## Bazarr          #   8091/tcp   #   6767/tcp   #
-## Dozzle          #   8089/tcp   #   8080/tcp   #
-## FileBrowser     #   8083/tcp   #    80/tcp    #
-## Handbrake       #   8097/tcp   #   5800/tcp   #
-## Homarr          #   8080/tcp   #   7575/tcp   #
-## Keycloak        #   8084/tcp   #   8080/tcp   #
-## Keycloak TLS    #   8085/tcp   #   8443/tcp   #  
-## Lidarr          #   8092/tcp   #   8686/tcp   #
-## Nginx Admin     #   8082/tcp   #   8181/tcp   #
-## Nginx Proxy     #  80/443/tcp  #  80/443/tcp  #
-## Overseerr       #   8090/tcp   #   5055/tcp   #
-## PGAdmin         #   8086/tcp   #    80/tcp    #
-## PGAdmin TLS     #   8087/tcp   #    443/tcp   $
-## Picard          #   8098/tcp   #   5800/tcp   #
-## Plex            #  32400/tcp   #  32400/tcp   #
-## Portainer       #   8081/tcp   #   9443/tcp   #
-## Prowlarr        #   8093/tcp   #   9696/tcp   #
-## Radarr          #   8094/tcp   #   7878/tcp   #
-## Readarr         #   8095/tcp   #   8787/tcp   #
-## Tautulli        #   8088/tcp   #   8181/tcp   #
-## Transmission    #   8100/tcp   #   9091/tcp   #
-## Sonarr          #   8096/tcp   #   8989/tcp   #
-## Wrapper         #   8099/tcp   #   8282/tcp   #
+  ## Authelia        #   8080/tcp   #   9091/tcp   #
+  ## Bazarr          #   8091/tcp   #   6767/tcp   #
+  ## Dozzle          #   8088/tcp   #   8080/tcp   #
+  ## FileBrowser     #   8084/tcp   #    80/tcp    #
+  ## Handbrake       #   8097/tcp   #   5800/tcp   #
+  ## Homarr          #   8083/tcp   #   7575/tcp   #
+  ## Lidarr          #   8092/tcp   #   8686/tcp   #
+  ## Nginx Admin     #   8082/tcp   #   8181/tcp   #
+  ## Nginx Proxy     #  80/443/tcp  #  80/443/tcp  #
+  ## OpenLDAP        #              #              #  - to add
+  ## Overseerr       #   8090/tcp   #   5055/tcp   #
+  ## PGAdmin         #   8085/tcp   #    80/tcp    #
+  ## PGAdmin TLS     #   8086/tcp   #    443/tcp   #
+  ## Picard          #   8098/tcp   #   5800/tcp   #
+  ## Plex            #  32400/tcp   #  32400/tcp   #
+  ## Portainer       #   8081/tcp   #   9443/tcp   #
+  ## Prowlarr        #   8093/tcp   #   9696/tcp   #
+  ## Radarr          #   8094/tcp   #   7878/tcp   #
+  ## Readarr         #   8095/tcp   #   8787/tcp   #
+  ## Tautulli        #   8087/tcp   #   8181/tcp   #
+  ## Transmission    #   8100/tcp   #   9091/tcp   #
+  ## Sonarr          #   8096/tcp   #   8989/tcp   #
+  ## Wrapper         #   8099/tcp   #   8282/tcp   #
 #
-########## SPECIAL Definition ##########
+########## SPECIAL DEFINITION ##########
 #
 # All services definition follow the same format
   # name
@@ -210,8 +236,38 @@ x-common-keys-media: &common-keys-media
   # >> Container Use Settings
   #   devices
   #   volumes
+  #   secrets
   #   environment
 #
+
+########## DOCKER SECURITY INFORMATION ##########
+# To limit threat vectors and attack landscape, limit what containers are connected to the Docker Socket API. As such connection enables execution of Docker commands.
+  # To achieve this, in this implementation, the container docker-socket-proxy has been added to proxy connection requests to the Docker Socket API.
+  #
+  # See: https://stackoverflow.com/questions/35110146/what-is-the-purpose-of-the-file-docker-sock
+  # See also: https://github.com/Tecnativa/docker-socket-proxy
+  # See also: https://dev.to/pbnj/docker-security-best-practices-45ih#docker-engine
+  #
+  # Containers with access to the Docker Socket will have this volume assigned as follows:
+  #
+  ##  volumes:
+  ##    - "/var/run/docker.sock:/var/run/docker.sock:ro"
+  #
+  # Containers might also be given this port access for the socket proxy
+  #
+  ##  environment:
+  ##    DOCKER_HOST: tcp://socket-proxy:2375
+  # 
+  # In this implementation the following are the only (currently) allowed apps to have access to the Docker Socket API directly:
+    ## Docker Socket Proxy # Socket Proxy Protection  #
+    ## Docker-GC           # Docker Garbage Collector #
+    ## Dozzle              # Docker Log Viewer        #
+    ## Portainer           # Container Manager        #
+    ## Watchtower          # Container Updater        #
+  #
+#  
+
+########## DOCKER APPS ##########
 
 services:
 
@@ -227,25 +283,27 @@ services:
     ports:
       - "2375:2375" # !!!WARNING!!! DO NOT EXPOSE OVER PUBLIC INTERNET
     volumes:
-      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
-      - LOG_LEVEL=info # debug,info,notice,warning,err,crit,alert,emerg
+      - TZ=${TZ}
+      - LOG_LEVEL=info # info for setup, change to 'err' or higher for production
+      # debug,info,notice,warning,err,crit,alert,emerg
+      #
       ## Variables match the URL prefix (i.e. AUTH blocks access to /auth/* parts of the API, etc.).
       # 0 to revoke access.
       # 1 to grant access.
       ## Granted by Default
       - EVENTS=1
       - PING=1
-      - VERSION=1
+      - VERSION=0 # Disabled for security purposes, potential change if needed by a container
       ## Revoked by Default
-      # Security critical
       - AUTH=0
       - SECRETS=0
       - POST=1 # Watchtower
-      # Not always needed
+      ## Not always needed
       - BUILD=0
       - COMMIT=0
-      - CONFIGS=0
+      - CONFIGS=0 # Disabled for security purposes, potential change if needed by a container
       - CONTAINERS=1 # Nginx, Portainer, etc.
       - DISTRIBUTION=0
       - EXEC=0
@@ -257,29 +315,31 @@ services:
       - SERVICES=1 # Portainer
       - SESSION=0
       - SWARM=0
-      - SYSTEM=0
+      - SYSTEM=0 
       - TASKS=1 # Portainer
       - VOLUMES=1 # Portainer
 
   # WatchTower - Automatic Docker Container Updates
   watchtower:
-      <<: *common-keys-core # See EXTENSION FIELDS at the top
-      container_name: watchtower
-      image: containrrr/watchtower
-      volumes:
-        - ${DOCKERDIR}/appdata/watchtower/config:/config
-        - /var/run/docker.sock:/var/run/docker.sock
-      environment:
-        TZ: ${TZ}
-        WATCHTOWER_CLEANUP: "true"
-        WATCHTOWER_REMOVE_VOLUMES: "true"
-        WATCHTOWER_INCLUDE_STOPPED: "true"
-        WATCHTOWER_NO_STARTUP_MESSAGE: "false"
-        WATCHTOWER_SCHEDULE: "0 30 12 * * *" # Everyday at 12:30
-        DOCKER_HOST: tcp://socket-proxy:2375
-        DOCKER_API_VERSION: "1.40"
-
-  ########## AUTHENTICATION ##########
+    <<: *common-keys-core # See EXTENSION FIELDS at the top
+    container_name: watchtower
+    image: containrrr/watchtower
+    networks:
+      #- backend_proxy # Check if needed
+      #- frontend_proxy # check if needed
+      - socket_proxy
+    volumes:
+      - ${DOCKERDIR}/appdata/watchtower/config:/config
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      <<: *higher-puid-pgid
+      WATCHTOWER_CLEANUP: "true"
+      WATCHTOWER_REMOVE_VOLUMES: "true"
+      WATCHTOWER_INCLUDE_STOPPED: "true"
+      WATCHTOWER_NO_STARTUP_MESSAGE: "false"
+      WATCHTOWER_SCHEDULE: "0 30 12 * * *" # Everyday at 12:30
+      DOCKER_HOST: tcp://socket-proxy:2375
+      DOCKER_API_VERSION: "1.40"
 
   ########## DOCKER UTILITES ##########
 
@@ -288,12 +348,14 @@ services:
     <<: *common-keys-apps # See EXTENSION FIELDS at the top
     container_name: docker-gc
     image: clockworksoul/docker-gc-cron:latest
+    networks:
+      - socket_proxy
     volumes:
       - ${DOCKERDIR}/appdata/docker-gc/config:/config
-      #- ${DOCKERDIR}/appdata/docker-gc/./docker-gc-exclude:/etc/docker-gc-exclude # Create empty file
+      - ${DOCKERDIR}/appdata/docker-gc/./docker-gc-exclude:/etc/docker-gc-exclude # Create empty file
       - /var/run/docker.sock:/var/run/docker.sock
     environment:
-      TZ: $TZ
+      <<: *higher-puid-pgid
       CRON: 0 0 0 * * ? # Run everyday at midnight
       FORCE_IMAGE_REMOVAL: 1
       FORCE_CONTAINER_REMOVAL: 0
@@ -307,9 +369,16 @@ services:
     <<: *common-keys-apps
     container_name: dozzle
     image: amir20/dozzle:latest
+    networks:
+      #- backend_proxy # Check if needed
+      #- frontend_proxy # Check if needed
+      - socket_proxy
     ports:
-      - "8089:8080" # INT PORT: 8080/tcp
+      - "8088:8080" # INT PORT: 8080/tcp
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
     environment:
+      <<: *higher-puid-pgid
       DOZZLE_LEVEL: info
       DOZZLE_FILTER: "label=log_me" # limits logs displayed to containers with this label.
       DOCKER_HOST: tcp://socket-proxy:2375
@@ -320,83 +389,16 @@ services:
     container_name: filebrowser
     image: filebrowser/filebrowser:s6
     ports:
-      - "8083:80" # INT PORT: 80/tcp
+      - "8084:80" # INT PORT: 80/tcp
     volumes:
       - ${DOCKERDIR}/appdata/filebrowser/config:/config 
       - ${DOCKERDIR}/appdata/filebrowser/data:/data
+      - ${DATADIR}/downloads:/downloads
     environment:
-      <<: *default-tz-puid-pgid
+      <<: *basic-tz-puid-pgid
+      <<: *disable-ipv6
 
-  ########## AUTHENTICATION ##########
-
-  # Keycloak - IPAM SSO Service
-  keycloak:
-    <<: *common-keys-core # See EXTENSION FIELDS at the top
-    container_name: keycloak
-    image: quay.io/keycloak/keycloak:latest
-    build:
-      context: .
-      args:
-        KEYCLOAK_VERSION: 22.0.0
-    command: ['start', '--optimized''', 'quarkus.transaction-manager.enable-recovery=true']
-    depends_on:
-      - postgres
-    ports:
-      - "8084:8080" # INT PORT: 8080/tcp (for init setup)
-      - "8085:8443" # INT PORT: 8443/tcp (secure port)
-      # - "8787:8787" # Debug port
-    volumes:
-      - ${DOCKERDIR}/appdata/keycloak/config:/config 
-      - ${DOCKERDIR}/appdata/keycloak/data:/data
-    environment:
-      JAVA_OPTS_APPEND: -Dkeycloak.profile.feature.upload_scripts=enabled
-      KC_DB_PASSWORD: ${KC_DB_PASS}
-      KC_DB_URL: jdbc:postgresql://postgres/keycloak
-      KC_DB_USERNAME: ${KC_DB_USER}
-      #KC_HEALTH_ENABLED: 'true'
-      KC_HTTP_ENABLED: 'true'
-      #KC_METRICS_ENABLED: 'true'
-      # KC_HOSTNAME: keycloak.com.au
-      # KC_HOSTNAME_PORT: 8180
-      KC_HOSTNAME_URL: http://keycloak.com.au:8180
-      KC_PROXY: reencrypt
-      KEYCLOAK_ADMIN: ${KC_USER}
-      KEYCLOAK_ADMIN_PASSWORD: ${KC_PASS}
-
-  ########## FRONTENDS ##########
-
-  # Homarr - Application Dashboard
-  homarr:
-    <<: *common-keys-core
-    container_name: homarr
-    image: ghcr.io/ajnart/homarr:latest
-    ports:
-      - "8080:7575" # INT PORT: 7575/tcp
-    volumes:
-      - ${DOCKERDIR}/appdata/homarr/config:/config
-      - ${DOCKERDIR}/appdata/homarr/data:/data
-      - ${DOCKERDIR}/appdata/homarr/icons:/app/public/icons
-    environment:
-      <<: *default-tz-puid-pgid
-      
-  # Nginx Proxy Manager - Reverse Proxy with LetsEncrypt
-  nginx:
-    <<: *common-keys-core
-    container_name: nginx
-    image: 'jc21/nginx-proxy-manager:latest'
-    ports:
-      - "80:80" # Disable after LetsEncrypt setup
-      - "443:443" # HTTPS PORT
-      - "8082:8181" # INT PORT: 8181/tcp (this is the admin port)
-    volumes:
-      - ${DOCKERDIR}/appdata/nginx/config:/config 
-      - ${DOCKERDIR}/appdata/nginx/data:/data
-      - ${DOCKERDIR}/appdata/nginx/letsencrypt:/etc/letsencrypt
-    environment:
-      DB_SQLITE_FILE: "/config/database.sqlite"
-      DISABLE_IPV6: 'true'
-
-  # Portainer - WebUI for Containers
+  # Portainer - Container Manager
   portainer:
     <<: *common-keys-core
     container_name: portainer
@@ -412,11 +414,86 @@ services:
       - ${DOCKERDIR}/appdata/portainer/data:/data
       - /var/run/docker.sock:/var/run/docker.sock
     environment:
-      <<: *default-tz-puid-pgid
+      <<: *basic-tz-puid-pgid
+      <<: *disable-ipv6
+      DOCKER_HOST: tcp://socket-proxy:2375
+
+  ########## AUTHENTICATION ##########
+
+  # Authelia - SSO Authentication Service
+  authelia:
+    <<: *common-keys-core
+    container_name: authelia
+    image: authelia/authelia
+    ports: 
+      - "8080:9091" # INT PORT: 9091/tcp
+    volumes:
+      - ${DOCKERDIR}/appdata/authelia/config:/config
+      - ${DOCKERDIR}/appdata/authelia/data:/data
+      - ${DOCKERDIR}/appdata/authelia/secrets:/secrets
+    secrets:
+      - AUTHELIA_ENCRYPTION_SECRETS_FILE
+      - AUTHELIA_JWT_SECRETS_FILE
+      - AUTHELIA_POSTGRES_SECRETS_FILE
+      - AUTHELIA_SESSION_SECRET_FILE
+    environment:
+      <<: *basic-tz-puid-pgid
+      <<: *disable-ipv6
+      AUTHELIA_IDENTITY_VALIDATION_RESET_PASSWORD_JWT_SECRET_FILE: /run/secrets/AUTHELIA_JWT_SECRETS_FILE
+      AUTHELIA_SESSION_SECRET_FILE: /run/secrets/AUTHELIA_SESSION_SECRETS_FILE
+      AUTHELIA_STORAGE_ENCRYPTION_KEY_FILE: /run/secrets/AUTHELIA_ENCRYPTION_SECRETS_FILE
+      AUTHELIA_STORAGE_POSTGRES_PASSWORD_FILE: /run/secrets/AUTHELIA_POSTGRES_SECRETS_FILE
+      #AUTHELIA_IDENTITY_VALIDATION_RESET_PASSWORD_JWT_SECRET_FILE: '/secrets/JWT_SECRET'
+      #AUTHELIA_SESSION_SECRET_FILE: '/secrets/SESSION_SECRET'
+      #AUTHELIA_STORAGE_ENCRYPTION_KEY_FILE: '/secrets/STORAGE_ENCRYPTION_KEY'
+      #AUTHELIA_STORAGE_POSTGRES_PASSWORD_FILE: '/secrets/STORAGE_PASSWORD'
+
+  # OpenLDAP - IAM Solution
+
+  #     FIX ME     # 
+  #     FIX ME     #
+  #     FIX ME     # 
+  #     FIX ME     # 
+  #     FIX ME     # 
+
+  ########## FRONTENDS ##########
+
+  # Homarr - Application Dashboard
+  homarr:
+    <<: *common-keys-core
+    container_name: homarr
+    image: ghcr.io/ajnart/homarr:latest
+    ports:
+      - "8083:7575" # INT PORT: 7575/tcp
+    volumes:
+      - ${DOCKERDIR}/appdata/homarr/config:/config
+      - ${DOCKERDIR}/appdata/homarr/data:/data
+      - ${DOCKERDIR}/appdata/homarr/icons:/app/public/icons
+    environment:
+      <<: *basic-tz-puid-pgid
+      <<: *disable-ipv6
+
+  # Nginx Proxy Manager - Reverse Proxy with LetsEncrypt
+  nginx:
+    <<: *common-keys-core
+    container_name: nginx
+    image: 'jc21/nginx-proxy-manager:latest'
+    ports:
+      - "80:80" # INT PORT: 80/tcp (http port for LetEncrypt setup !!! WARNING !!! This should be closed for production setups)
+      - "443:443" # INT PORT: 443/tcp (https port)
+      - "8082:8181" # INT PORT: 8181/tcp (admin port)
+    volumes:
+      - ${DOCKERDIR}/appdata/nginx/config:/config 
+      - ${DOCKERDIR}/appdata/nginx/data:/data
+      - ${DOCKERDIR}/appdata/nginx/letsencrypt:/etc/letsencrypt
+      - ${DOCKERDIR}/data/nginx/snippets:/snippets
+    environment:
+      <<: *disable-ipv6
+      DB_SQLITE_FILE: "/config/database.sqlite"
 
   ########## BACKENDS ##########
 
-  # Postgres - Database for Keycloak
+  # Postgres - Database for Authelia and OpenLDAP
   postgres:
     <<: *common-keys-db
     container_name: postgres
@@ -432,9 +509,14 @@ services:
       - ${DOCKERDIR}/appdata/postgres/config:/config
       - ${DOCKERDIR}/appdata/postgres/data:/var/lib/postgresql/data
       #- ./sql:/docker-entrypoint-initdb.d/:ro # turn it on, if you need run init DB
+    secrets:
+      - DB_SECRETS_FILE
     environment:
+      <<: *basic-tz-puid-pgid
+      <<: *disable-ipv6
       POSTGRES_USER: ${DB_USER}
-      POSTGRES_PASSWORD: ${DB_PASS}
+      POSTGRES_ROOT_PASSWORD_FILE: /run/secrets/DB_ROOT_SECRETS_FILE
+      POSTGRES_PASSWORD_FILE: /run/secrets/DB_SECRETS_FILE
       POSTGRES_DB: ${DB_NAME}
       POSTGRES_HOST: ${DB_HOST}
 
@@ -446,46 +528,21 @@ services:
     depends_on:
       - postgres
     ports:
-      - "8086:80" # INT PORT: 80/tcp (for init setup)
-      - "8087:9443" # INT PORT: 9443/tcp (secure port)
+      - "8085:80" # INT PORT: 80/tcp (http port for init setup !!! WARNING !!! This should be closed for production setups)
+      - "8086:9443" # INT PORT: 9443/tcp (https port)
     volumes:
       - ${DOCKERDIR}/appdata/pgadmin/config:/config
       - ${DOCKERDIR}/appdata/pgadmin/data:/data
+      - ${DOCKERDIR}/appdata/pgadmin/certs/priv.cert:/certs/server.cert
+      - ${DOCKERDIR}/appdata/pgadmin/certs/priv.key:/certs/server.key
     environment:
+      <<: *basic-tz-puid-pgid
+      <<: *disable-ipv6
       PGADMIN_DEFAULT_EMAIL: ${PG_EMAIL}
       PGADMIN_DEFAULT_PASSWORD: ${PG_PASS}
       PGADMIN_ENABLE_TLS: true
 
   ########## DOWNLOADERS/VPNS ##########
-
-  # GlueTun - VPN Client
-  gluetun:
-    <<: *common-keys-apps
-    container_name: gluetun
-    image: qmcgaw/gluetun
-    cap_add:
-      - NET_ADMIN
-    devices:
-      - /dev/net/tun:/dev/net/tun
-    command: [update, -enduser, -providers, mullvad]
-    ports:
-      - "8888:8888" # HTTP proxy
-      - "8388:8388/tcp" # Shadowsocks
-      - "8388:8388/udp" # Shadowsocks
-    volumes:
-      - ${DOCKERDIR}/appdata/gluetun/data:/data
-      - ${DOCKERDIR}/appdata/gluetun/config:/config
-      - /etc/localtime:/etc/localtime:ro
-    environment:
-      VPN_SERVICE_PROVIDER: ivpn
-      VPN_TYPE: openvpn
-      # OpenVPN:
-      OPENVPN_USER: blank
-      OPENVPN_PASSWOR: blank
-      # Wireguard:
-      # WIREGUARD_PRIVATE_KEY=
-      # WIREGUARD_ADDRESSES=
-      UPDATER_PERIOD: 1d
 
   # Transmission - Torrentor
   transmission:
@@ -496,8 +553,8 @@ services:
       - gluetun
     ports:
       - "8100:9091" # INT PORT: 9091/tcp
-      - "51413:51413"
-      - "51413:51413/udp"
+      - "51413:51413" # INT PORT 51413/tcp
+      - "51413:51413/udp" # INT PORT 51413/udp
     cap_add:
       - NET_ADMIN
     devices:
@@ -507,7 +564,8 @@ services:
       - ${DOCKERDIR}/appdata/transmission/data:/data
       - ${DATADIR}/downloads:/downloads
     environment:
-      <<: *default-tz-puid-pgid
+      # Leave IPv6 enabled for easier torrenting
+      <<: *basic-tz-puid-pgid
       TRANSMISSION_WEB_HOME: #optional
       USER=: #optional
       PASS: #optional
@@ -530,7 +588,9 @@ services:
       - ${DATADIR}/media/movies:/media/movies
       - ${DATADIR}/media/tvshows:/media/tvshows
     environment:
-      <<: *default-tz-puid-pgid
+      <<: *basic-tz-puid-pgid
+      <<: *disable-ipv6
+      UMASK_SET: 002
 
   # Lidarr - Music Management
   lidarr:
@@ -545,7 +605,8 @@ services:
       - ${DATADIR}/downloads:/downloads
       - ${DATADIR}/media/music:/media
     environment:
-      <<: *default-tz-puid-pgid
+      <<: *basic-tz-puid-pgid
+      <<: *disable-ipv6
 
   # Overseerr - Media Requester
   overseerr:
@@ -557,9 +618,10 @@ services:
     volumes:
       - ${DOCKERDIR}/apps/overseer/config:/config
       - ${DOCKERDIR}/appdata/overseer/data:/data
-      - ${DATADIR}/downloads:/downloads
+      - ${DATADIR}/downloads:/downloads #Is this necessary?
     environment:
-      <<: *default-tz-puid-pgid
+      <<: *basic-tz-puid-pgid
+      <<: *disable-ipv6
 
   # Prowlarr - Indexer Management
   prowlarr:
@@ -573,7 +635,8 @@ services:
       - ${DOCKERDIR}/appdata/prowlarr/data:/data
       - ${DATADIR}/downloads:/downloads
     environment:
-      <<: *default-tz-puid-pgid
+      <<: *basic-tz-puid-pgid
+      <<: *disable-ipv6
 
   # Radarr - Movie Management
   radarr:
@@ -586,9 +649,10 @@ services:
       - ${DOCKERDIR}/apps/radarr/config:/config
       - ${DOCKERDIR}/appdata/radarr/data:/data/
       - ${DATADIR}/downloads:/downloads
-      - ${DATADIR}/media/movies:/media
+      - ${DATADIR}/media/movies:/media/movies
     environment:
-      <<: *default-tz-puid-pgid
+      <<: *basic-tz-puid-pgid
+      <<: *disable-ipv6
 
   # Readarr - Books Management
   readarr:
@@ -601,10 +665,10 @@ services:
       - ${DOCKERDIR}/appdata/readarr/config:/config
       - ${DOCKERDIR}/appdata/readarr/data:/data
       - ${DATADIR}/downloads:/downloads
-      - ${DATADIR}/media/books:/media
+      - ${DATADIR}/media/books:/media/books
     environment:
-      <<: *default-tz-puid-pgid
-      UMASK: 002
+      <<: *basic-tz-puid-pgid
+      <<: *disable-ipv6
 
   # Sonarr - TV Shows Management
   sonarr:
@@ -617,9 +681,11 @@ services:
       - ${DOCKERDIR}/apps/sonarr/config:/config
       - ${DOCKERDIR}/appdata/sonarr/data:/data
       - ${DATADIR}/downloads:/downloads
-      - ${DATADIR}/media/tvshows:/media
+      - ${DATADIR}/media/tvshows:/media/tvshows
     environment:
-      <<: *default-tz-puid-pgid
+      <<: *basic-tz-puid-pgid
+      <<: *disable-ipv6
+      UMASK_SET: 002
   
   ########## MEDIA SERVER APPS ##########
 
@@ -635,9 +701,12 @@ services:
       - ${DOCKERDIR}/appdata/handbrake/data:/data
       - ${DOCKERDIR}/appdata/handbrake/watch:/watch
       - ${DATADIR}/downloads:/downloads
+      - ${DATADIR}/media/tvshows:/media/tvshows
+      - ${DATADIR}/media/movies:/media/movies
     environment:
-      <<: *default-tz-puid-pgid
-      UMASK: 002
+      <<: *basic-tz-puid-pgid
+      <<: *disable-ipv6
+      UMASK_SET: 002
       KEEP_APP_RUNNING: 1
       CLEAN_TMP_DIR: 1
       DISPLAY_WIDTH: 1600
@@ -658,10 +727,10 @@ services:
       - ${DATADIR}/media/playlists:/media/playlists
       - /dev/shm:/dev/shm
     environment:
-      <<: *default-tz-puid-pgid
-      UMASK: 002
-      DISPLAY_WIDTH: 1600
-      DISPLAY_HEIGHT: 960
+      <<: *basic-tz-puid-pgid
+      <<: *disable-ipv6
+      DISPLAY_WIDTH: 1920
+      DISPLAY_HEIGHT: 1080
 
   # Plex - Media Server
   plex:
@@ -691,7 +760,8 @@ services:
       - ${DATADIR}/media/tvshows:/media/tvshows
       - /dev/shm:/transcode
     environment:
-      <<: *default-tz-puid-pgid
+      <<: *basic-tz-puid-pgid
+      <<: *disable-ipv6
       HOSTNAME: "media.${DOMAIN}"
       #PLEX_CLAIM_FILE: $PLEX_CLAIM # is this even needed
       ADVERTISE_IP: http://${SERVER_IP}:32400/
@@ -704,13 +774,14 @@ services:
     depends_on:
       - plex
     ports:
-      - "8088:8181" # INT PORT: 8181/tcp
+      - "8087:8181" # INT PORT: 8181/tcp
     volumes:
       - ${DOCKERDIR}/appdata/tautulli/config:/config
       - ${DOCKERDIR}/appdata/tautulli/data:/data
       - ${DOCKERDIR}/appdata/plex/Library/Application Support/Plex Media Server/Logs:/logs:ro # For tautulli Plex log viewer
     environment:
-      <<: *default-tz-puid-pgid
+      <<: *basic-tz-puid-pgid
+      <<: *disable-ipv6
       
   # Wrapperr - Plex History and UX Helper
   wrapperr:
@@ -725,4 +796,5 @@ services:
       - ${DOCKERDIR}/appdata/wrapperr/config:/config
       - ${DOCKERDIR}/appdata/wrapperr/data:/data
     environment:
-      <<: *default-tz-puid-pgid
+      <<: *basic-tz-puid-pgid
+      <<: *disable-ipv6

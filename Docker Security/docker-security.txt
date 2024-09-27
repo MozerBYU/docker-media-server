@@ -1,0 +1,15 @@
+# Limit communication to a UNIX port
+
+dockerd -H "unix:///var/run/docker.sock"
+
+# Limit docker container privileges
+
+docker run -d --cap-add SYS_PTRACE ubuntu
+
+# Disable IPv6 if not in use
+environment:
+      DISABLE_IPV6: 'true'
+
+# Run Docker User as UID 1000 (not root) rather than UID 0 (root)
+
+# Enable SELinux or AppArmor if possible to limit Docker scope, SYSCALLs and filesystem permission
