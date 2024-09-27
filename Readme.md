@@ -2,19 +2,18 @@
 
 All-in-one, Infrastructure-as-a-Code (IaaC) Docker Compose File for setting up a Plex Media Server infrastructure. Additionally includes the ARR apps for various media requesting and management, integrated with VPNs and torrentors/downloaders and SSO Authentication for easy media management and secure access.
 
-
 Recently updated as of 9/26/2024 to include Docker Best Security Practices, courtesy of Official Docker Documentation and OWASP.
 
 Security Best Practices Checklist:
-- Deny access to the Docker Socket API except where absolutely necessary (containers that rely on this permission have been noted in the 'Docker Security' section)
-- Run Docker process as a separate 'Docker' user (UID 1001 or higher)
-- Limit container capabilities (only container using cap_add is Transmission)
-- Prevent in-container privilege escalation (all containers have a set UID and GUID respective to their permission level)
-- Limit inter-connectivity between containers where possible (hence the separate container networks of frontend, backend, socket)
-- Use Linux Security Modules such as SecComp, AppArmor and SELinux (not currently enabled in this version, but will be added later)
-- Limit over resource utilization (not currently enabled in this version, but will be added later)
-- Set read-only file systems permission where possible (due to the nature of the containers involved in this project, this is not utilized very much)
-- Ensure official and trusted container respositories are utilized and container scanning for malicious code
+✅ Deny access to the Docker Socket API except where absolutely necessary (containers that rely on this permission have been noted in the 'Docker Security' section)
+✅ Run Docker process as a separate 'Docker' user (UID 1001 or higher)
+✅ Limit container capabilities (only container using cap_add is Transmission)
+✅ Prevent in-container privilege escalation (all containers have a set UID and GUID respective to their permission level)
+✅ Limit inter-connectivity between containers where possible (hence the separate container networks of frontend, backend, socket)
+✅ Use Linux Security Modules such as SecComp, AppArmor and SELinux (not currently enabled in this version, but will be added later)
+✅ Limit over resource utilization (not currently enabled in this version, but will be added later)
+✅ Set read-only file systems permission where possible (due to the nature of the containers involved in this project, this is not utilized very much)
+✅ Ensure official and trusted container respositories are utilized and container scanning for malicious code
 
 See: https://cheatsheetseries.owasp.org/cheatsheets/Docker_Security_Cheat_Sheet.html
 
