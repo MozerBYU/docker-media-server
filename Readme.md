@@ -15,13 +15,15 @@ Security Best Practices Checklist:
 - ✅ Set read-only file systems permission where possible (due to the nature of the containers involved in this project, this is not utilized very much)
 - ✅ Ensure official and trusted container respositories are utilized and container scanning for malicious code
 
+See: https://cheatsheetseries.owasp.org/cheatsheets/Docker_Security_Cheat_Sheet.html
+
 Network Security Best Practices Checklist:
 - ✅ Segment and isolation networks between public facing, private facing, and backend networks
 - ✅ Limit or disable IPv6 if not in use
 - ✅ Ensure HTTPS/TLS is in use for inter-connectivity between containers, especially if authentication, session cookies or jwt tokens are in use
-- ✅ Disable SSL entirely and TLS v1.1. Instead enforce TLS v1.2 or v1.3, and ensure TLS uses secure Cipher Suites (see: https://developers.cloudflare.com/ssl/edge-certificates/additional-options/cipher-suites/recommendations/)
+- ✅ Disable SSL entirely and TLS v1.1. Instead enforce TLS v1.2 or v1.3, and ensure TLS uses secure Cipher Suites
 
-See: https://cheatsheetseries.owasp.org/cheatsheets/Docker_Security_Cheat_Sheet.html
+See: https://developers.cloudflare.com/ssl/edge-certificates/additional-options/cipher-suites/recommendations/
 
 ### Apps Included (by Alphabetical Order)
 - Authelia
