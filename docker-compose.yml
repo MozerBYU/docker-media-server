@@ -1,34 +1,33 @@
-version: "3.9"
-
 ########## SECRETS ##########
 # The use of docker secrets is for importing secrets from files to keep sensitive usernames or passwords from being passed or preserved in plaintext.
 #
 ## See: https://docs.docker.com/engine/swarm/secrets/#defining-and-using-secrets-in-compose-files
 ## See also: https://docs.docker.com/reference/compose-file/secrets/
 #
-##### AUTHELIA SECRETS #####
-AUTHELIA_ENCRYPTION_SECRETS_FILE:
-  file: ${SECRETSDIR}/.secrets/authelia__encryption_secrets.txt
-AUTHELIA_JWT_SECRETS_FILE:
-  file: ${SECRETSDIR}/.secrets/authelia_jwt_secrets.txt
-AUTHELIA_POSTGRES_SECRETS_FILE:
-  file: ${SECRETSDIR}/.secrets/authelia_postgres_secrets.txt
-AUTHELIA_SESSION_SECRETS_FILE:
-  file: ${SECRETSDIR}/.secrets/authelia_session_secrets.txt
+secrets:
+  ##### AUTHELIA SECRETS #####
+  AUTHELIA_ENCRYPTION_SECRETS_FILE:
+    file: ${SECRETSDIR}/.secrets/authelia__encryption_secrets.txt
+  AUTHELIA_JWT_SECRETS_FILE:
+    file: ${SECRETSDIR}/.secrets/authelia_jwt_secrets.txt
+  AUTHELIA_POSTGRES_SECRETS_FILE:
+    file: ${SECRETSDIR}/.secrets/authelia_postgres_secrets.txt
+  AUTHELIA_SESSION_SECRET_FILE:
+    file: ${SECRETSDIR}/.secrets/authelia_session_secrets.txt
 
-##### DATABASE SECRETS #####
-DB_ROOT_SECRETS_FILE:
-  file: ${SECRETSDIR}/.secrets/db_root_secrets.txt
-DB_SECRETS_FILE:
-  file: ${SECRETSDIR}/.secrets/db_secrets.txt
-PGADMIN_SECRETS_FILE:
-  file: ${SECRETSDIR}/.secrets/pgadmin_secrets.txt
+  ##### DATABASE SECRETS #####
+  DB_ROOT_SECRETS_FILE:
+    file: ${SECRETSDIR}/.secrets/db_root_secrets.txt
+  DB_SECRETS_FILE:
+    file: ${SECRETSDIR}/.secrets/db_secrets.txt
+  PGADMIN_SECRETS_FILE:
+    file: ${SECRETSDIR}/.secrets/pgadmin_secrets.txt
 
-##### LDAP SECRETS #####
-LDAP_ADMIN_SECRETS_FILE:
-  file: ${SECRETSDIR}/.secrets/ldap_root_secrets.txt 
-LDAP_CONFIG_SECRETS_FILE:
-  file: ${SECRETSDIR}/.secrets/ldap_config_secrets.txt
+  ##### LDAP SECRETS #####
+  LDAP_ADMIN_SECRETS_FILE:
+    file: ${SECRETSDIR}/.secrets/ldap_root_secrets.txt 
+  LDAP_CONFIG_SECRETS_FILE:
+    file: ${SECRETSDIR}/.secrets/ldap_config_secrets.txt
 
 ########## NETWORKS ##########
 # You may customize the network subnets as you please.
@@ -63,11 +62,13 @@ x-environment-no-privilege: &basic-tz-puid-pgid
   TZ: ${TZ}
   PUID: ${PUID}
   PGID: ${PGID}
+  DISABLE_IPV6: "true"
 
 x-environment-some-privilege: &higher-tz-puid-pgid
   TZ: ${TZ}
   PUID: ${PUID_PRIV}
   PGID: ${PGID_PRIV}
+  DISABLE_IPV6: "true"
 
 x-environment-network: &disable-ipv6
   DISABLE_IPV6: "true"
@@ -310,7 +311,6 @@ services:
       - BUILD=0
       - COMMIT=0
       - CONFIGS=0 # Disabled for security purposes, potential change if needed by a container
-      - CONTAINERS=1 # Nginx, Portainer, etc.
       - DISTRIBUTION=0
       - EXEC=0
       - IMAGES=1 # Portainer
@@ -338,7 +338,7 @@ services:
       - ${DOCKERDIR}/appdata/watchtower/config:/config
       - /var/run/docker.sock:/var/run/docker.sock
     environment:
-      <<: *higher-puid-pgid
+      <<: *higher-tz-puid-pgid
       WATCHTOWER_CLEANUP: "true"
       WATCHTOWER_REMOVE_VOLUMES: "true"
       WATCHTOWER_INCLUDE_STOPPED: "true"
@@ -358,10 +358,18 @@ services:
       - socket_proxy
     volumes:
       - ${DOCKERDIR}/appdata/docker-gc/config:/config
-      - ${DOCKERDIR}/appdata/docker-gc/./docker-gc-exclude:/etc/docker-gc-exclude # Create empty file
+      # NOTE: mounting a host FILE to a container path is required by this image
+      # The previous bind to '${DOCKERDIR}/appdata/docker-gc/docker-gc-exclude' failed because the host path was not a file.
+      # Docker named volumes are always directories and cannot be mounted as a single file.
+      # Options:
+      # 1) Create the host file and keep this bind (recommended on non-swarm setups):
+      #    - ${DOCKERDIR}/appdata/docker-gc/docker-gc-exclude:/etc/docker-gc-exclude
+      #    Create file on host: New-Item -ItemType File -Force -Path 'C:\docker\appdata\docker-gc\docker-gc-exclude'
+      # 2) Remove the bind (below) and run without an exclude file (dockergc will run with default behavior).
+      # If you want me to create the host file for you, tell me and I'll add it.
       - /var/run/docker.sock:/var/run/docker.sock
     environment:
-      <<: *higher-puid-pgid
+      <<: *higher-tz-puid-pgid
       CRON: 0 0 0 * * ? # Run everyday at midnight
       FORCE_IMAGE_REMOVAL: 1
       FORCE_CONTAINER_REMOVAL: 0
@@ -384,7 +392,7 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     environment:
-      <<: *higher-puid-pgid
+      <<: *higher-tz-puid-pgid
       DOZZLE_LEVEL: info
       DOZZLE_FILTER: "label=log_me" # limits logs displayed to containers with this label.
       DOCKER_HOST: tcp://socket-proxy:2375
@@ -402,7 +410,6 @@ services:
       - ${DATADIR}/downloads:/downloads
     environment:
       <<: *basic-tz-puid-pgid
-      <<: *disable-ipv6
 
   # Portainer - Container Manager
   portainer:
@@ -421,7 +428,6 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
     environment:
       <<: *basic-tz-puid-pgid
-      <<: *disable-ipv6
       DOCKER_HOST: tcp://socket-proxy:2375
 
   ########## AUTHENTICATION ##########
@@ -444,10 +450,9 @@ services:
       - AUTHELIA_SESSION_SECRET_FILE
     environment:
       <<: *basic-tz-puid-pgid
-      <<: *disable-ipv6
       # Using secrets file
       AUTHELIA_IDENTITY_VALIDATION_RESET_PASSWORD_JWT_SECRET_FILE: /run/secrets/AUTHELIA_JWT_SECRETS_FILE
-      AUTHELIA_SESSION_SECRET_FILE: /run/secrets/AUTHELIA_SESSION_SECRETS_FILE
+      AUTHELIA_SESSION_SECRET_FILE: /run/secrets/AUTHELIA_SESSION_SECRET_FILE
       AUTHELIA_STORAGE_ENCRYPTION_KEY_FILE: /run/secrets/AUTHELIA_ENCRYPTION_SECRETS_FILE
       AUTHELIA_STORAGE_POSTGRES_PASSWORD_FILE: /run/secrets/AUTHELIA_POSTGRES_SECRETS_FILE
       # Using an attached secret file via volume
@@ -459,7 +464,7 @@ services:
   # OpenLDAP - IAM Solution
   openldap-main:
     <<: *common-keys-core
-    container_name: openldap-backup
+    container_name: openldap-main
     image: osixia/openldap:1.5.0
     tty: true
     stdin_open: true
@@ -470,14 +475,12 @@ services:
     # Note: 'hostname'.'domainname' must be the FQDN for the host for replication to work properly
     hostname: "ldap2"
     domainname: "domain.tld"
-    network:
+    networks:
       - backend_proxy
-    ports:
-      - "389:389" # INT PORT 389/tcp
-      - "636:636" # INT PORT 636/rcp
+    # Do NOT publish host ports for the backup instance to avoid host port conflicts.
+    # The primary `openldap-main` publishes the needed ports; backup stays internal on the Docker network.
     environment:
-      <<: *default-tz-puid-pgid
-      <<: *disable-ipv6
+      <<: [*basic-tz-puid-pgid, *disable-ipv6]
       LDAP_LOG_LEVEL: "256"
       LDAP_ORGANISATION: "Example Inc."
       LDAP_DOMAIN: "domain.tld"
@@ -521,14 +524,13 @@ services:
     # Note: 'hostname'.'domainname' must be the FQDN for the host for replication to work properly
     hostname: "ldap2"
     domainname: "domain.tld"
-    network:
+    networks:
       - backend_proxy
     ports:
       - "389:389" # INT PORT 389/tcp
       - "636:636" # INT PORT 636/rcp
     environment:
-      <<: *default-tz-puid-pgid
-      <<: *disable-ipv6
+      <<: *basic-tz-puid-pgid
       LDAP_LOG_LEVEL: "256"
       LDAP_ORGANISATION: "Example Inc."
       LDAP_DOMAIN: "domain.tld"
@@ -574,7 +576,6 @@ services:
       - ${DOCKERDIR}/appdata/homarr/icons:/app/public/icons
     environment:
       <<: *basic-tz-puid-pgid
-      <<: *disable-ipv6
 
   # Nginx Proxy Manager - Reverse Proxy with LetsEncrypt
   nginx:
@@ -616,7 +617,6 @@ services:
       - DB_SECRETS_FILE
     environment:
       <<: *basic-tz-puid-pgid
-      <<: *disable-ipv6
       POSTGRES_USER: ${DB_USER}
       POSTGRES_ROOT_PASSWORD_FILE: /run/secrets/DB_ROOT_SECRETS_FILE
       POSTGRES_PASSWORD_FILE: /run/secrets/DB_SECRETS_FILE
@@ -640,7 +640,6 @@ services:
       - ${DOCKERDIR}/appdata/pgadmin/certs/priv.key:/certs/server.key
     environment:
       <<: *basic-tz-puid-pgid
-      <<: *disable-ipv6
       PGADMIN_DEFAULT_EMAIL: ${PG_EMAIL}
       PGADMIN_DEFAULT_PASSWORD: ${PG_PASS}
       PGADMIN_ENABLE_TLS: true
@@ -651,9 +650,7 @@ services:
   transmission:
     <<: *common-keys-apps
     container_name: transmission
-    image: lscr.io/linuxserver/transmission:latest
-    depends_on:
-      - gluetun
+    image: linuxserver/transmission:latest
     ports:
       - "8100:9091" # INT PORT: 9091/tcp
       - "51413:51413" # INT PORT 51413/tcp
@@ -676,12 +673,14 @@ services:
       PEERPORT: #optional
       HOST_WHITELIST: #optional
 
+  # (gluetun removed) Transmission will run without a VPN by default
+
   ########## MEDIA APPS - THE ARRs ##########
 
   # Bazarr - Subtitle Management
   bazarr:
     <<: *common-keys-media # See EXTENSION FIELDS at the top
-    image: lscr.io/linuxserver/bazarr
+    image: linuxserver/bazarr:latest
     container_name: bazarr
     ports:
       - "8091:6767" # INT PORT: 6767/tcp
@@ -692,14 +691,13 @@ services:
       - ${DATADIR}/media/tvshows:/media/tvshows
     environment:
       <<: *basic-tz-puid-pgid
-      <<: *disable-ipv6
       UMASK_SET: 002
 
   # Lidarr - Music Management
   lidarr:
     <<: *common-keys-media
     container_name: lidarr
-    image: lscr.io/linuxserver/lidarr:latest
+    image: linuxserver/lidarr:latest
     ports:
       - "8092:8686" # INT PORT: 8686/tcp
     volumes:
@@ -709,13 +707,12 @@ services:
       - ${DATADIR}/media/music:/media
     environment:
       <<: *basic-tz-puid-pgid
-      <<: *disable-ipv6
 
   # Overseerr - Media Requester
   overseerr:
     <<: *common-keys-apps
     container_name: overseerr
-    image: lscr.io/linuxserver/overseerr:latest
+    image: linuxserver/overseerr:latest
     ports:
       - "8090:5055" # INT PORT: 5055/tcp
     volumes:
@@ -724,7 +721,6 @@ services:
       - ${DATADIR}/downloads:/downloads #Is this necessary?
     environment:
       <<: *basic-tz-puid-pgid
-      <<: *disable-ipv6
 
   # Prowlarr - Indexer Management
   prowlarr:
@@ -739,13 +735,12 @@ services:
       - ${DATADIR}/downloads:/downloads
     environment:
       <<: *basic-tz-puid-pgid
-      <<: *disable-ipv6
 
   # Radarr - Movie Management
   radarr:
     <<: *common-keys-media
     container_name: radarr
-    image: lscr.io/linuxserver/radarr:latest
+    image: linuxserver/radarr:latest
     ports:
       - "8094:7878" # INT PORT: 7878/tcp
     volumes:
@@ -755,13 +750,12 @@ services:
       - ${DATADIR}/media/movies:/media/movies
     environment:
       <<: *basic-tz-puid-pgid
-      <<: *disable-ipv6
 
   # Readarr - Books Management
   readarr:
     <<: *common-keys-media
     container_name: readarr
-    image: lscr.io/linuxserver/readarr:develop
+    image: linuxserver/readarr:0.4.19-nightly
     ports:
       - "8095:8787" # INT PORT: 8787/tcp
     volumes:
@@ -771,13 +765,12 @@ services:
       - ${DATADIR}/media/books:/media/books
     environment:
       <<: *basic-tz-puid-pgid
-      <<: *disable-ipv6
 
   # Sonarr - TV Shows Management
   sonarr:
     <<: *common-keys-media
     container_name: sonarr
-    image: lscr.io/linuxserver/sonarr:latest
+    image: linuxserver/sonarr:latest
     ports:
       - "8096:8989" # INT PORT: 8989/tcp
     volumes:
@@ -787,7 +780,6 @@ services:
       - ${DATADIR}/media/tvshows:/media/tvshows
     environment:
       <<: *basic-tz-puid-pgid
-      <<: *disable-ipv6
       UMASK_SET: 002
   
   ########## MEDIA SERVER APPS ##########
@@ -808,7 +800,6 @@ services:
       - ${DATADIR}/media/movies:/media/movies
     environment:
       <<: *basic-tz-puid-pgid
-      <<: *disable-ipv6
       UMASK_SET: 002
       KEEP_APP_RUNNING: 1
       CLEAN_TMP_DIR: 1
@@ -831,7 +822,6 @@ services:
       - /dev/shm:/dev/shm
     environment:
       <<: *basic-tz-puid-pgid
-      <<: *disable-ipv6
       DISPLAY_WIDTH: 1920
       DISPLAY_HEIGHT: 1080
 
@@ -841,18 +831,20 @@ services:
     container_name: plex
     image: plexinc/pms-docker:public
     ports:
-      - "32400:32400" # INT PORT: 32400/tcp (this is the web port)
+      - "32200:32400" # host 32200 -> container 32400 (avoid Windows reserved ranges)
       - "3005:3005/tcp"
       - "8324:8324/tcp"
-      - "32469:32469/tcp"
+      - "32269:32469/tcp"
       # - "1900:1900/udp" # Conflicts with xTeVe and Synology default ports
-      - "32410:32410/udp"
-      - "32412:32412/udp"
-      - "32413:32413/udp"
-      - "32414:32414/udp"
+      - "32210:32410/udp"
+      - "32212:32412/udp"
+      - "32213:32413/udp"
+      - "32214:32414/udp"
       # - "33400:33400" # If you use Plex Web Tools
-    devices:
-      - /dev/dri:/dev/dri # for harware transcoding
+    # GPU passthrough disabled on Windows (no /dev/dri).
+    # To enable hardware transcoding on a Linux host, restore these lines:
+    # devices:
+    #   - /dev/dri:/dev/dri
     volumes:
       - ${DOCKERDIR}/appdata/plex/config:/config
       - ${DOCKERDIR}/appdata/plex/data:/data
@@ -864,7 +856,6 @@ services:
       - /dev/shm:/transcode
     environment:
       <<: *basic-tz-puid-pgid
-      <<: *disable-ipv6
       HOSTNAME: "media.${DOMAIN}"
       #PLEX_CLAIM_FILE: $PLEX_CLAIM # is this even needed
       ADVERTISE_IP: http://${SERVER_IP}:32400/
@@ -884,7 +875,6 @@ services:
       - ${DOCKERDIR}/appdata/plex/Library/Application Support/Plex Media Server/Logs:/logs:ro # For tautulli Plex log viewer
     environment:
       <<: *basic-tz-puid-pgid
-      <<: *disable-ipv6
       
   # Wrapperr - Plex History and UX Helper
   wrapperr:
@@ -900,4 +890,3 @@ services:
       - ${DOCKERDIR}/appdata/wrapperr/data:/data
     environment:
       <<: *basic-tz-puid-pgid
-      <<: *disable-ipv6
